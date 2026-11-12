@@ -180,6 +180,11 @@ select,input[type=text],input[type=number]{background:var(--soft);border:0;borde
 .locmsg.err{color:var(--warn)}
 .cg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 
+.adhan-box{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.adhan-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn:disabled{opacity:.45;cursor:default}
+.file-btn{position:relative;overflow:hidden}
+.file-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
 .toast{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));z-index:40;
   max-width:520px;margin:0 auto;background:var(--ink);color:var(--bg);border-radius:16px;padding:14px 16px;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .toast div{flex:1;min-width:0}
@@ -197,7 +202,7 @@ select,input[type=text],input[type=number]{background:var(--soft);border:0;borde
         <span id="cityName">—</span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
-      <div class="hdate"><div id="hijri"></div><div id="greg"></div></div>
+      <div class="hdate"><div id="hijri"></div><div id="greg"></div><div>الساعة الآن <span class="num" id="clock"></span></div></div>
     </div>
     <div class="next" id="nextLbl">—</div>
     <div class="cd num" id="countdown" aria-live="off">--:--:--</div>
@@ -331,11 +336,14 @@ const store = {
 };
 const FIRST_RUN = store.get("settings", null) === null;
 const DEFAULTS = {city:"casa", gps:null, custom:null, method:"auto", asr:1, adj:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},
-  hijriAdj:0, h12:false, notify:{on:false, sound:true, before:0, athkar:true, per:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}}};
+  hijriAdj:0, h12:false, tzFix:0, notify:{on:false, tone:"adhan", before:0, athkar:true, per:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}}};
 let S = Object.assign({}, DEFAULTS, store.get("settings", {}));
 S.adj = Object.assign({}, DEFAULTS.adj, S.adj||{});
 S.notify = Object.assign({}, DEFAULTS.notify, S.notify||{});
 S.notify.per = Object.assign({}, DEFAULTS.notify.per, S.notify.per||{});
+if(S.notify.sound===false && !store.get("toneSet",false)) S.notify.tone="none";
+delete S.notify.sound;
+if(!["adhan","chime","none"].includes(S.notify.tone)) S.notify.tone="adhan";
 const save = () => store.set("settings", S);
 const IN_FRAME = (()=>{ try{ return window.self!==window.top; }catch(e){ return true; } })();
 const DEVICE_TZ = (()=>{ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }catch(e){ return "UTC"; } })();
@@ -379,7 +387,26 @@ function partsIn(tz,date){
   const o={}; for(const p of f.formatToParts(date)) o[p.type]=p.value;
   return {y:+o.year,m:+o.month,d:+o.day,H:(+o.hour)%24,M:+o.minute,s:+o.second};
 }
-function tzOffset(tz,y,m,d){ try{ const u=Date.UTC(y,m-1,d,12), p=partsIn(tz,new Date(u)); return (Date.UTC(p.y,p.m-1,p.d,p.H,p.M)-u)/3600000; }catch(e){ return -new Date().getTimezoneOffset()/60; } }
+// Morocco returned to GMT (UTC+0) for good on 20 Sept 2026 at 03:00 → 02:00.
+// Many phones and browsers still carry the old rule (UTC+1), so this date is enforced here.
+const MA_GMT_FROM = Date.UTC(2026,8,20,2,0);
+const MA_TZ = ["Africa/Casablanca","Africa/El_Aaiun"];
+function intlOffset(tz,ms){
+  try{ const s=Math.floor(ms/1000)*1000, p=partsIn(tz,new Date(s)); return Math.round((Date.UTC(p.y,p.m-1,p.d,p.H,p.M,p.s)-s)/60000)/60; }
+  catch(e){ return -new Date(ms).getTimezoneOffset()/60; }
+}
+function offsetAt(tz,ms){
+  const base = (MA_TZ.includes(tz) && ms>=MA_GMT_FROM) ? 0 : intlOffset(tz,ms);
+  return base + (+S.tzFix||0);
+}
+function tzOffset(tz,y,m,d){ return offsetAt(tz, Date.UTC(y,m-1,d,12)); }
+function localNow(tz){
+  const ms=Date.now(), x=new Date(ms+offsetAt(tz,ms)*3600000);
+  return {y:x.getUTCFullYear(),m:x.getUTCMonth()+1,d:x.getUTCDate(),H:x.getUTCHours(),M:x.getUTCMinutes(),s:x.getUTCSeconds()};
+}
+// Countries spanning several time zones keep the device zone; others use the country's zone.
+const MULTI_TZ = ["US","CA","ID","AU","RU","BR","MX","KZ"];
+function tzFor(cc){ return (COUNTRIES[cc] && !MULTI_TZ.includes(cc)) ? COUNTRIES[cc].tz : DEVICE_TZ; }
 function addDays(y,m,d,n){ const x=new Date(Date.UTC(y,m-1,d+n)); return [x.getUTCFullYear(),x.getUTCMonth()+1,x.getUTCDate()]; }
 function distKm(a1,o1,a2,o2){ const p1=a1*R,p2=a2*R,dp=(a2-a1)*R,dl=(o2-o1)*R; const a=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2; return 6371*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
 function qibla(loc){ const dl=KAABA.lng-loc.lng;
@@ -398,13 +425,13 @@ function gregStr(y,m,d){ try{ return new Intl.DateTimeFormat("ar-MA-u-nu-latn",{
 let tab="prayer", athTab=null, T=null, Tn=null, Ty=null, today=null, nowH=0, loc=null;
 const SKY={isha:["#0D1530","#28335F"],fajr:["#1F2A5C","#575A9C"],sunrise:["#A54E33","#D88A4C"],dhuhr:["#135E92","#3A94C1"],asr:["#8C5419","#B97D30"],maghrib:["#7A2F4E","#C2574A"]};
 function currentLoc(){
-  if(S.city==="gps" && S.gps) return S.gps;
+  if(S.city==="gps" && S.gps) return Object.assign({}, S.gps, {tz: tzFor(S.gps.cc)});
   if(S.city==="custom" && S.custom) return S.custom;
   const c=CITIES.find(x=>x[0]===S.city)||CITIES[0];
   return {id:c[0],name:c[1],lat:c[2],lng:c[3],cc:c[4],tz:COUNTRIES[c[4]].tz};
 }
 function refreshDay(){
-  loc=currentLoc(); const p=partsIn(loc.tz,new Date()); today=[p.y,p.m,p.d];
+  loc=currentLoc(); const p=localNow(loc.tz); today=[p.y,p.m,p.d];
   T=computeDay(p.y,p.m,p.d,loc);
   const n=addDays(p.y,p.m,p.d,1), y=addDays(p.y,p.m,p.d,-1);
   Tn=computeDay(n[0],n[1],n[2],loc); Ty=computeDay(y[0],y[1],y[2],loc);
@@ -597,7 +624,19 @@ function viewSettings(){
   <div class="h">التنبيهات</div>
   <section class="card">
     ${sw("n_on",S.notify.on,"تنبيه الأذان")}
-    ${sw("n_sound",S.notify.sound,"الصوت")}
+    <div class="field"><span class="lbl">صوت التنبيه</span>
+      <div class="seg" role="radiogroup" aria-label="صوت التنبيه">
+        ${[["adhan","الأذان"],["chime","نغمة"],["none","صامت"]].map(([v,l])=>`<button role="radio" data-tone="${v}" aria-selected="${S.notify.tone===v}" aria-checked="${S.notify.tone===v}">${l}</button>`).join("")}
+      </div>
+      ${S.notify.tone==="adhan"?`<div class="adhan-box">
+        <span class="small ${adhan.src?"":"muted"}" id="adhanLbl">${adhanLabel()}</span>
+        <div class="adhan-btns">
+          <button class="btn soft" data-adhan-play ${adhan.src?"":"disabled"}>${adhan.playing?"إيقاف":"استماع"}</button>
+          <label class="btn soft file-btn">اختيار ملف<input type="file" id="adhanFile" accept="audio/*"></label>
+          ${adhan.from==="mine"?`<button class="link small" data-adhan-clear>حذف ملفي</button>`:""}
+        </div>
+      </div>`:""}
+    </div>
     ${sw("n_ath",S.notify.athkar,"تذكير الأذكار")}
     <div class="field"><label for="n_before">تذكير قبل الأذان</label><select id="n_before">${[0,5,10,15,30].map(v=>`<option value="${v}"${+S.notify.before===v?" selected":""}>${v?v+" دقائق":"بدون"}</option>`).join("")}</select></div>
     <div class="field"><span class="muted small">تعمل التنبيهات ما دام التطبيق مفتوحاً.</span><button class="btn soft" data-test>تجربة</button></div>
@@ -605,6 +644,8 @@ function viewSettings(){
   <div class="h">العرض</div>
   <section class="card">
     ${sw("h12",S.h12,"نظام 12 ساعة")}
+    <div class="field"><label for="tzfix">تصحيح الساعة</label><select id="tzfix">${[-1,0,1].map(v=>`<option value="${v}"${+S.tzFix===v?" selected":""}>${v===0?"بدون (تلقائي)":(v>0?"+1 ساعة":"‎-1 ساعة")}</option>`).join("")}</select>
+      <span class="muted small">استعمله فقط إذا ظهرت المواقيت متقدمة أو متأخرة بساعة كاملة.</span></div>
     <div class="field"><label for="hadj">تعديل التاريخ الهجري</label><select id="hadj">${[-2,-1,0,1,2].map(v=>`<option value="${v}"${+S.hijriAdj===v?" selected":""}>${v>0?"+"+v:v} يوم</option>`).join("")}</select></div>
   </section>`;
 }
@@ -632,11 +673,11 @@ async function useGPS(silent, msgEl){
       : r.err===1 ? "لم يُسمح بالوصول إلى موقعك. فعّله من إعدادات المتصفح، أو اختر مدينتك." : "تعذّر تحديد موقعك. حاول مرة أخرى أو اختر مدينتك.", true);
     return false; }
   const near=nearestCity(r.lat,r.lng);
-  let name = near && near.km<30 ? near.name : null, cc = near ? near.cc : "XX";
+  let name = near && near.km<30 ? near.name : null, cc = near && near.km<300 ? near.cc : "XX";
   if(!IN_FRAME){ try{ const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),5000);
       const j=await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${r.lat.toFixed(4)}&longitude=${r.lng.toFixed(4)}&localityLanguage=ar`,{signal:ctl.signal})).json();
       clearTimeout(to); name = j.city || j.locality || name; if(j.countryCode) cc=j.countryCode; }catch(e){} }
-  S.gps={id:"gps", name:name||"موقعي الحالي", lat:+r.lat.toFixed(5), lng:+r.lng.toFixed(5), tz:DEVICE_TZ, cc};
+  S.gps={id:"gps", name:name||"موقعي الحالي", lat:+r.lat.toFixed(5), lng:+r.lng.toFixed(5), tz:tzFor(cc), cc};
   S.city="gps"; save(); full(); return true;
 }
 
@@ -688,23 +729,72 @@ function chime(){ if(!audioCtx) return; try{ const t0=audioCtx.currentTime;
   [523.25,659.25,783.99,1046.5,783.99].forEach((f,i)=>{ const o=audioCtx.createOscillator(), g=audioCtx.createGain(), st=t0+i*0.42;
     o.type="sine"; o.frequency.value=f; g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(0.22,st+0.04); g.gain.exponentialRampToValueAtTime(0.0001,st+1.8);
     o.connect(g); g.connect(audioCtx.destination); o.start(st); o.stop(st+1.9); }); }catch(e){} }
-function toast(title,body){ document.querySelectorAll(".toast").forEach(x=>x.remove());
+/* ---- Adhan: the viewer's own file (kept in IndexedDB) or adhan.mp3 next to the page ---- */
+const adhan={src:null, from:null, name:"", el:null, playing:false, unlocked:false};
+function adhanEl(){
+  if(!adhan.el){ const a=new Audio(); a.preload="auto";
+    a.addEventListener("ended",()=>{ adhan.playing=false; syncAdhanUI(); });
+    a.addEventListener("pause",()=>{ adhan.playing=false; syncAdhanUI(); });
+    a.addEventListener("play",()=>{ if(!a.muted){ adhan.playing=true; syncAdhanUI(); } });
+    adhan.el=a; }
+  return adhan.el;
+}
+function adhanLabel(){
+  if(adhan.from==="mine") return "ملفك: "+adhan.name;
+  if(adhan.from==="site") return "الأذان المرفق بالتطبيق";
+  return "لا يوجد ملف أذان بعد. اختر ملفاً صوتياً (mp3) من هاتفك.";
+}
+function syncAdhanUI(){
+  const b=document.querySelector("[data-adhan-play]"); if(b) b.textContent=adhan.playing?"إيقاف":"استماع";
+  const t=document.querySelector(".toast [data-stop]"); if(t && !adhan.playing) t.textContent="حسناً";
+}
+function idb(){ return new Promise((res,rej)=>{ try{ const r=indexedDB.open("salat",1);
+  r.onupgradeneeded=()=>r.result.createObjectStore("files"); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }catch(e){ rej(e); } }); }
+async function idbDo(mode,fn){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction("files",mode), st=tx.objectStore("files"), r=fn(st);
+  tx.oncomplete=()=>res(r&&r.result); tx.onerror=()=>rej(tx.error); }); }
+function setAdhanSrc(src,from,name){ if(adhan.src && adhan.from==="mine" && adhan.src!==src){ try{ URL.revokeObjectURL(adhan.src); }catch(e){} }
+  adhan.src=src; adhan.from=from; adhan.name=name||""; adhan.unlocked=false; const a=adhanEl(); a.src=src||""; }
+async function loadAdhan(){
+  try{ const rec=await idbDo("readonly",st=>st.get("adhan")); if(rec&&rec.blob){ setAdhanSrc(URL.createObjectURL(rec.blob),"mine",rec.name); return; } }catch(e){}
+  try{ const r=await fetch("adhan.mp3",{method:"HEAD",cache:"no-store"}); const ct=r.headers.get("content-type")||"";
+    if(r.ok && !/html/.test(ct)) setAdhanSrc("adhan.mp3","site"); }catch(e){}
+}
+async function saveAdhanFile(file){
+  if(!file) return;
+  if(file.size>25*1024*1024){ toast("الملف كبير جداً","اختر ملفاً أقل من 25 ميغابايت."); return; }
+  try{ await idbDo("readwrite",st=>st.put({blob:file,name:file.name},"adhan")); }catch(e){}
+  setAdhanSrc(URL.createObjectURL(file),"mine",file.name); render();
+}
+async function clearAdhanFile(){ try{ await idbDo("readwrite",st=>st.delete("adhan")); }catch(e){}
+  stopAdhan(); setAdhanSrc(null,null,""); await loadAdhan(); render(); }
+// Phones only let a page play audio it has already started from a tap: prime the player on the first tap.
+function unlockAudio(){ ensureAudio(); if(!adhan.src||adhan.unlocked||adhan.playing) return; const a=adhanEl();
+  a.muted=true; const p=a.play(); if(p&&p.then) p.then(()=>{ a.pause(); a.currentTime=0; a.muted=false; adhan.unlocked=true; }).catch(()=>{ a.muted=false; }); }
+document.addEventListener("pointerdown",unlockAudio,true);
+function playAdhan(){ if(!adhan.src){ chime(); return; } const a=adhanEl(); a.muted=false; a.currentTime=0;
+  const p=a.play(); if(p&&p.catch) p.catch(()=>{ adhan.playing=false; chime(); }); }
+function stopAdhan(){ if(adhan.el){ adhan.el.pause(); try{ adhan.el.currentTime=0; }catch(e){} } adhan.playing=false; syncAdhanUI(); }
+
+function toast(title,body,stoppable){ document.querySelectorAll(".toast").forEach(x=>x.remove());
   const el=document.createElement("div"); el.className="toast"; el.setAttribute("role","alert"); el.setAttribute("dir","rtl");
-  el.innerHTML=`<div><b></b><span></span></div><button>حسناً</button>`; el.querySelector("b").textContent=title; el.querySelector("span").textContent=body;
-  el.querySelector("button").onclick=()=>el.remove(); document.getElementById("app").appendChild(el); }
-function fire(title,body){ toast(title,body); if(S.notify.sound) chime();
+  el.innerHTML=`<div><b></b><span></span></div><button data-stop>${stoppable?"إيقاف الأذان":"حسناً"}</button>`; el.querySelector("b").textContent=title; el.querySelector("span").textContent=body;
+  el.querySelector("button").onclick=()=>{ stopAdhan(); el.remove(); }; document.getElementById("app").appendChild(el); }
+function fire(title,body,isAdhan){
+  const useAdhan = isAdhan && S.notify.tone==="adhan" && !!adhan.src;
+  toast(title,body,useAdhan);
+  if(useAdhan) playAdhan(); else if(S.notify.tone!=="none") chime();
   try{ navigator.vibrate&&navigator.vibrate([250,120,250]); }catch(e){}
   try{ if("Notification" in window && Notification.permission==="granted") new Notification(title,{body}); }catch(e){} }
-function enableNotify(){ ensureAudio(); S.notify.on=true; save();
+function enableNotify(){ ensureAudio(); unlockAudio(); S.notify.on=true; save();
   try{ if("Notification" in window && Notification.permission==="default") Notification.requestPermission().catch(()=>{}); }catch(e){}
-  chime(); render(); }
+  render(); }
 function checkNotify(){ if(!S.notify.on) return; const day=today.join("-"), ev=[];
   for(const k of FIVE){ if(!S.notify.per[k]) continue;
-    ev.push({at:T[k],key:day+k,t:"حان وقت صلاة "+PNAME[k],b:loc.name+" · "+fmt(T[k])});
+    ev.push({at:T[k],key:day+k,t:"حان وقت صلاة "+PNAME[k],b:loc.name+" · "+fmt(T[k]),adhan:true});
     if(+S.notify.before>0) ev.push({at:T[k]-S.notify.before/60,key:day+k+"b",t:PNAME[k]+" بعد "+S.notify.before+" دقائق",b:"الأذان على الساعة "+fmt(T[k])}); }
   if(S.notify.athkar){ ev.push({at:T.fajr+20/60,key:day+"am",t:"أذكار الصباح",b:"وقتها حتى الشروق "+fmt(T.sunrise)});
     ev.push({at:T.asr+20/60,key:day+"pm",t:"أذكار المساء",b:"وقتها حتى المغرب "+fmt(T.maghrib)}); }
-  for(const e of ev) if(nowH>=e.at && nowH<e.at+2/60 && !fired.has(e.key)){ fired.add(e.key); fire(e.t,e.b); } }
+  for(const e of ev) if(nowH>=e.at && nowH<e.at+2/60 && !fired.has(e.key)){ fired.add(e.key); fire(e.t,e.b,e.adhan); } }
 
 /* ================= Events ================= */
 const TABS=["prayer","qibla","athkar","settings"];
@@ -718,7 +808,10 @@ document.getElementById("view").addEventListener("click",e=>{
     if(!S.notify.on){ for(const x of FIVE) S.notify.per[x]=x===k; enableNotify(); return; }
     S.notify.per[k]=!S.notify.per[k]; save(); render(); return; }
   if(e.target.closest("[data-enable-notify]")){ for(const x of FIVE) S.notify.per[x]=true; enableNotify(); return; }
-  if(e.target.closest("[data-test]")){ ensureAudio(); fire("حان وقت صلاة "+PNAME[nextPrayer().k],"تجربة التنبيه · "+loc.name); return; }
+  if(e.target.closest("[data-test]")){ ensureAudio(); fire("حان وقت صلاة "+PNAME[nextPrayer().k],"تجربة التنبيه · "+loc.name,true); return; }
+  const tn=e.target.closest("[data-tone]"); if(tn){ S.notify.tone=tn.dataset.tone; store.set("toneSet",true); save(); if(tn.dataset.tone!=="adhan") stopAdhan(); render(); return; }
+  if(e.target.closest("[data-adhan-play]")){ if(adhan.playing) stopAdhan(); else playAdhan(); return; }
+  if(e.target.closest("[data-adhan-clear]")){ clearAdhanFile(); return; }
   if(e.target.closest("#liveBtn")){ startCompass(); return; }
   const a=e.target.closest("[data-ath]"); if(a){ athTab=a.dataset.ath; render(); return; }
   if(e.target.closest("[data-reset]")){ const st=athState(); athList(athTab).forEach(x=>delete st.c[x.id]); store.set("athkar",st); render(); return; }
@@ -734,7 +827,8 @@ document.getElementById("view").addEventListener("change",e=>{
   else if(el.id==="asr") S.asr=+el.value;
   else if(el.dataset.adj) S.adj[el.dataset.adj]=Math.max(-60,Math.min(60,parseInt(el.value)||0));
   else if(el.id==="n_on"){ if(el.checked){ enableNotify(); return; } S.notify.on=false; }
-  else if(el.id==="n_sound"){ S.notify.sound=el.checked; if(el.checked) ensureAudio(); }
+  else if(el.id==="adhanFile"){ saveAdhanFile(el.files&&el.files[0]); return; }
+  else if(el.id==="tzfix") S.tzFix=+el.value;
   else if(el.id==="n_ath") S.notify.athkar=el.checked;
   else if(el.id==="n_before") S.notify.before=+el.value;
   else if(el.id==="hadj") S.hijriAdj=+el.value;
@@ -745,7 +839,8 @@ document.getElementById("view").addEventListener("change",e=>{
 
 /* ================= Clock ================= */
 let lastKey="";
-function updateNow(){ const p=partsIn(loc.tz,new Date()); nowH=p.H+p.M/60+p.s/3600;
+function updateNow(){ const p=localNow(loc.tz); nowH=p.H+p.M/60+p.s/3600;
+  const ck=document.getElementById("clock"); if(ck) ck.textContent=fmt(p.H+p.M/60-0.4/60);
   const dk=p.y+"-"+p.m+"-"+p.d; if(dk!==today.join("-")){ refreshDay(); return true; }
   const mk=dk+" "+p.H+":"+p.M; if(mk!==lastKey){ lastKey=mk; return true; } return false; }
 function full(){ refreshDay(); updateNow(); render(); tick(); }
@@ -754,6 +849,7 @@ setInterval(()=>{ if(updateNow()){ if(tab==="prayer"){ const y=window.scrollY; r
 const h0=(location.hash||"").replace("#",""); if(TABS.includes(h0)) tab=h0;
 window.addEventListener("hashchange",()=>{ const x=location.hash.replace("#",""); if(x!==tab&&TABS.includes(x)){ tab=x; render(); } });
 full();
+loadAdhan().then(()=>{ if(tab==="settings") render(); });
 // Location on open: refresh GPS position if chosen, or try once on first run (outside the Claude preview)
 if(!IN_FRAME && (S.city==="gps" || FIRST_RUN)) useGPS(true,null);
 </script>
