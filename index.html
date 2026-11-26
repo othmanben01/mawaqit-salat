@@ -1156,7 +1156,10 @@ async function enablePush(){
     store.set("pushSent",{p:JSON.stringify(prefs),at:Date.now()});
     S.push.on=true; S.notify.on=true; store.set("settings",S);
     setPushMsg("تم التفعيل. ستصلك إشعارات الصلاة حتى والتطبيق مغلق.");
-  }catch(e){ setPushMsg("تعذّر التفعيل ("+(e.message||e)+"). تحقّق من الاتصال وحاول مجدداً.",true); }
+  }catch(e){
+    const net = e instanceof TypeError || /load failed|failed to fetch|network/i.test(String(e.message||e));
+    setPushMsg(net ? "تعذّر الوصول إلى خادم الإشعارات ("+CFG.pushApi.replace("https://","")+"). افتح هذا العنوان في Safari وأرسل لقطة الشاشة."
+      : "تعذّر التفعيل ("+(e.message||e)+"). حاول مجدداً.", true); }
   pushBusy=false; render();
 }
 async function disablePush(){

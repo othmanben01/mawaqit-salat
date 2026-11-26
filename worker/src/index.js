@@ -14,11 +14,16 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(req.url);
     if (!url.pathname.startsWith("/api/")) return new Response("Mawaqit push server: OK", { headers: cors });
-    const hub = env.HUB.get(env.HUB.idFromName("main"));
-    const res = await hub.fetch(req);
-    const h = new Headers(res.headers);
-    for (const [k, v] of Object.entries(cors)) h.set(k, v);
-    return new Response(res.body, { status: res.status, headers: h });
+    // Any failure still answers with CORS headers, so the app can show the real reason.
+    try {
+      const hub = env.HUB.get(env.HUB.idFromName("main"));
+      const res = await hub.fetch(req);
+      const h = new Headers(res.headers);
+      for (const [k, v] of Object.entries(cors)) h.set(k, v);
+      return new Response(res.body, { status: res.status, headers: h });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "worker", message: String(e && e.message || e) }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } });
+    }
   },
   async scheduled(event, env, ctx) {
     const hub = env.HUB.get(env.HUB.idFromName("main"));
