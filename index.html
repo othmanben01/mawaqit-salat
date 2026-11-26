@@ -1169,13 +1169,16 @@ function pushBlock(){
   else if(st==="frame") body=`<span class="note">الإشعارات تعمل من رابط التطبيق على GitHub، وليس داخل معاينة Claude.</span>`;
   else if(st==="unsupported") body=`<span class="note">هذا المتصفح لا يدعم الإشعارات. على iPhone حدّث النظام إلى iOS 16.4 أو أحدث.</span>`;
   else if(st==="noserver") body=`<span class="note">خادم الإشعارات لم يُربط بالتطبيق بعد.</span>`;
-  else if(st==="denied") body=`<span class="note err">الإشعارات ممنوعة لهذا التطبيق. افتح إعدادات الهاتف ← الإشعارات ← مواقيت، وفعّل «السماح بالإشعارات».</span>`;
+  else if(st==="denied") body=`<ol class="steps">
+      <li><span>افتح <b>الإعدادات</b> في الهاتف ← <b>الإشعارات</b> ← <b>مواقيت</b></span></li>
+      <li><span>فعّل «<b>السماح بالإشعارات</b>»، ثم ارجع واضغط «تفعيل»</span></li></ol>
+      <span class="note">إن لم تجد «مواقيت» في القائمة: احذف أيقونة التطبيق من الشاشة الرئيسية، ثم أضفها من جديد عبر Safari.</span>`;
   else if(st==="off") body=`<button class="btn block" data-push-on ${pushBusy?"disabled":""}>${bellSvg(true).replace('<svg','<svg width="18" height="18"')} تفعيل إشعارات الهاتف</button>`;
   else body=`<div class="row2"><button class="btn soft" data-push-test ${pushBusy?"disabled":""}>إرسال إشعار تجريبي</button><button class="btn ghost" data-push-off ${pushBusy?"disabled":""}>إيقاف</button></div>`;
   return `<div class="push">
     <div class="push-top"><span class="ic">${bellSvg(true).replace('<svg','<svg width="20" height="20"')}</span><span class="grow"><b>إشعارات الهاتف</b><span class="small muted">تصلك في وقت كل صلاة حتى والتطبيق مغلق</span></span>${pill}</div>
     ${body}
-    ${pushMsg?`<span class="note ${pushMsgErr?"err":""}">${esc(pushMsg)}</span>`:""}
+    ${pushMsg&&st!=="denied"?`<span class="note ${pushMsgErr?"err":""}">${esc(pushMsg)}</span>`:""}
   </div>`;
 }
 
@@ -1243,15 +1246,72 @@ function updateNow(){ const p=localNow(loc.tz); nowH=p.H+p.M/60+p.s/3600;
 function full(){ refreshDay(); updateNow(); render(); tick(); }
 setInterval(()=>{ if(updateNow()){ if(tab==="prayer"){ const y=window.scrollY; render(); window.scrollTo({top:y}); } else renderHero(); checkNotify(); } tick(); }, 1000);
 // Coming back to the app (iPhone keeps it frozen in the background): refresh right away.
-document.addEventListener("visibilitychange",()=>{ if(document.hidden) return; full();
-  if(S.city==="gps" && S.gps && Date.now()-(S.gps.at||0)>30*60000) useGPS(true,null); });
+document.addEventListener("visibilitychange",()=>{ if(document.hidden) return; full(); quietGPS(); });
+
+/* Location never prompts on its own: the saved position is reused, and it is refreshed
+   silently only when the phone has already granted access (iPhone home-screen apps ask again each launch). */
+async function geoGranted(){ try{ const p=await navigator.permissions.query({name:"geolocation"}); return p.state==="granted"; }catch(e){ return false; } }
+async function quietGPS(){
+  if(IN_FRAME || S.city!=="gps" || !S.gps) return;
+  if(Date.now()-(S.gps.at||0) < 6*3600000) return;
+  if(await geoGranted()) useGPS(true,null);
+}
+
+/* First launch: one screen that turns on notifications and location with a single tap. */
+function maybeWelcome(){
+  if(IN_FRAME || store.get("welcomed",false)) return;
+  if(pushState()==="on"){ store.set("welcomed",true); return; }
+  openWelcome();
+}
+function openWelcome(){
+  const st=pushState(), bg=document.createElement("div"); bg.className="sheet-bg"; bg.setAttribute("dir","rtl");
+  const bell=bellSvg(true).replace('<svg','<svg width="18" height="18"');
+  let body;
+  if(st==="install") body=`
+    <h2>ثبّت التطبيق أولاً</h2>
+    <p class="muted" style="margin:0">لتصلك إشعارات الصلاة على iPhone، يجب فتح التطبيق من الشاشة الرئيسية.</p>
+    <ol class="steps">
+      <li><span>اضغط زر المشاركة ${shareSvg} في Safari</span></li>
+      <li><span>اختر «<b>إضافة إلى الشاشة الرئيسية</b>» ثم «إضافة»</span></li>
+      <li><span>افتح <b>مواقيت</b> من الأيقونة الجديدة</span></li></ol>
+    <button class="btn ghost block" data-w-close>فهمت</button>`;
+  else if(st==="denied") body=`
+    <h2>الإشعارات ممنوعة</h2>
+    <ol class="steps">
+      <li><span>افتح <b>الإعدادات</b> في الهاتف ← <b>الإشعارات</b> ← <b>مواقيت</b></span></li>
+      <li><span>فعّل «<b>السماح بالإشعارات</b>»، ثم ارجع إلى التطبيق</span></li></ol>
+    <p class="note" style="margin:0">إن لم تجد «مواقيت» في القائمة: احذف أيقونة التطبيق من الشاشة الرئيسية، ثم أضفها من جديد عبر Safari.</p>
+    <button class="btn ghost block" data-w-close>حسناً</button>`;
+  else body=`
+    <h2>مرحباً بك</h2>
+    <p class="muted" style="margin:0">لتصلك مواقيت الصلاة في وقتها، فعّل الإشعارات وحدّد موقعك مرة واحدة.</p>
+    <button class="btn block" data-w-go>${bell} تفعيل الإشعارات والموقع</button>
+    <div class="locmsg" id="wmsg"></div>
+    <button class="btn ghost block" data-w-city>اختيار مدينة يدوياً</button>
+    <button class="link small" data-w-close style="align-self:center">لاحقاً</button>`;
+  bg.innerHTML=`<div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${body}</div>`;
+  document.getElementById("app").appendChild(bg);
+  // Safari and the home-screen app keep separate storage on iPhone, so closing here never hides it in the app.
+  const close=()=>{ store.set("welcomed",true); bg.remove(); };
+  bg.addEventListener("click",async e=>{
+    if(e.target===bg || e.target.closest("[data-w-close]")){ close(); return; }
+    if(e.target.closest("[data-w-city]")){ close(); openSheet(); return; }
+    const go=e.target.closest("[data-w-go]"); if(!go) return;
+    go.disabled=true;
+    S.notify.on=true; ensureAudio(); unlockAudio(); store.set("settings",S);
+    if(pushState()==="off") await enablePush();   // the notification request comes first, straight from the tap
+    const m=bg.querySelector("#wmsg");
+    if(pushState()==="denied"){ m.textContent="لم يُسمح بالإشعارات. يمكنك تفعيلها لاحقاً من إعدادات الهاتف."; m.className="locmsg err"; }
+    const ok=await useGPS(false,m);
+    if(ok){ setTimeout(close,1200); } else go.disabled=false;
+  });
+}
 
 const h0=(location.hash||"").replace("#",""); if(TABS.includes(h0)) tab=h0;
 window.addEventListener("hashchange",()=>{ const x=location.hash.replace("#",""); if(x!==tab&&TABS.includes(x)){ tab=x; render(); } });
 full();
 loadAdhan().then(()=>{ if(tab==="settings") render(); });
-initPush();
-// Location on open: refresh GPS position if chosen, or try once on first run (outside the Claude preview)
-if(!IN_FRAME && (S.city==="gps" || FIRST_RUN)) useGPS(true,null);
+initPush().then(maybeWelcome);
+quietGPS();
 </script>
 </body></html>
