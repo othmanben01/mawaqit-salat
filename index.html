@@ -1118,9 +1118,9 @@ function checkNotify(){ if(!S.notify.on) return; const day=today.join("-"), ev=[
   for(const e of ev) if(nowH>=e.at && nowH<e.at+2/60 && !fired.has(e.key)){ fired.add(e.key); fire(e.t,e.b,e.adhan); } }
 
 /* ================= Push notifications (work with the app closed) ================= */
-const CFG={pushApi:""};
+const CFG={pushApi:"", publicKey:""};
 let swReg=null, pushSub=null, pushBusy=false, pushMsg="", pushMsgErr=false, syncTimer=0;
-async function loadConfig(){ try{ const r=await fetch("config.json",{cache:"no-store"}); if(r.ok){ const j=await r.json(); if(j&&j.pushApi) CFG.pushApi=String(j.pushApi).replace(/\/+$/,""); } }catch(e){} }
+async function loadConfig(){ try{ const r=await fetch("config.json",{cache:"no-store"}); if(r.ok){ const j=await r.json(); if(j&&j.pushApi) CFG.pushApi=String(j.pushApi).replace(/\/+$/,""); if(j&&j.publicKey) CFG.publicKey=String(j.publicKey); } }catch(e){} }
 function unb64u(s){ s=String(s).replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4) s+="="; const b=atob(s), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
 function pushState(){
   if(IN_FRAME) return "frame";
@@ -1131,9 +1131,20 @@ function pushState(){
   return S.push.on && pushSub ? "on" : "off";
 }
 // text/plain keeps these "simple" requests (no CORS preflight); the server still reads JSON.
+// If the phone refuses to read the server's answer, the request is sent again in "no-cors" mode:
+// the server still receives it, the app just cannot read the reply.
 async function api(path,body){
-  const r=await fetch(CFG.pushApi+"/api/"+path, body?{method:"POST",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify(body),cache:"no-store"}:{cache:"no-store"});
+  const url=CFG.pushApi+"/api/"+path;
+  const opts=body?{method:"POST",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify(body),cache:"no-store"}:{cache:"no-store"};
+  let r;
+  try{ r=await fetch(url,opts); }
+  catch(e){
+    if(!body) throw e;
+    await fetch(url,Object.assign({},opts,{mode:"no-cors"}));   // throws only if the network itself fails
+    return {ok:true, opaque:true};
+  }
   const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error((j.error||"HTTP")+" "+r.status+(j.message?" "+j.message:"")); return j; }
+async function serverKey(){ if(CFG.publicKey) return CFG.publicKey; return (await api("key")).publicKey; }
 function pushPrefs(){ const M=METHODS[methodKey(loc)];
   return {lat:loc.lat,lng:loc.lng,tz:loc.tz,name:loc.name, method:{fajr:M.fajr,isha:M.isha||0,ishaMin:M.ishaMin||0,adj:M.adj||{}},
     asr:S.asr, adj:S.adj, tzFix:S.tzFix, per:S.notify.per, before:+S.notify.before, athkar:!!S.notify.athkar, friday:!!S.notify.friday}; }
@@ -1149,7 +1160,7 @@ async function enablePush(){
   let step="sw";
   try{
     const reg=swReg||await navigator.serviceWorker.ready;
-    step="key"; const {publicKey}=await api("key"), appKey=unb64u(publicKey);
+    step="key"; const publicKey=await serverKey(), appKey=unb64u(publicKey);
     step="apple";
     pushSub=await reg.pushManager.getSubscription();
     if(!pushSub){
@@ -1165,7 +1176,7 @@ async function enablePush(){
     setPushMsg("تم التفعيل. ستصلك إشعارات الصلاة حتى والتطبيق مغلق.");
   }catch(e){
     const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
-    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v7]", true);
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v8]", true);
   }
   pushBusy=false; render();
 }
@@ -1176,7 +1187,8 @@ async function disablePush(){
 }
 async function testPush(){
   if(!pushSub) return; setPushMsg("جارٍ الإرسال…"); render();
-  try{ const r=await api("test",{endpoint:pushSub.endpoint}); setPushMsg(r.ok?"أُرسل إشعار تجريبي. أغلق التطبيق لتراه كما سيظهر.":"لم يقبل الهاتف الإشعار (رمز "+r.status+").", !r.ok); }
+  try{ const r=await api("test",{endpoint:pushSub.endpoint});
+    setPushMsg(r.opaque?"أُرسل طلب الإشعار التجريبي. أغلق التطبيق، يجب أن يصل خلال ثوانٍ.":r.ok?"أُرسل إشعار تجريبي. أغلق التطبيق لتراه كما سيظهر.":"لم يقبل الهاتف الإشعار (رمز "+r.status+").", !r.ok&&!r.opaque); }
   catch(e){ setPushMsg("تعذّر الإرسال ("+(e.message||e)+").",true); }
   render();
 }
