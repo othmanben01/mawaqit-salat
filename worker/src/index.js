@@ -52,6 +52,8 @@ export class Hub extends DurableObject {
     const path = new URL(req.url).pathname;
     try {
       if (path === "/api/key") return json({ publicKey: (await this.vapid()).publicKey });
+      // Fallback opened in Safari when the home-screen app cannot reach the server itself.
+      if (path === "/api/link") return this.link(new URL(req.url).searchParams.get("d") || "");
       if (req.method !== "POST") return json({ error: "method" }, 405);
       if (path === "/api/tick") {
         if (req.headers.get("x-cron") !== "1") return json({ error: "forbidden" }, 403);
@@ -96,6 +98,27 @@ export class Hub extends DurableObject {
       prefs, sent: old ? old.sent : null, fails: 0, created: old ? old.created : Date.now(), updated: Date.now(),
     });
     return json({ ok: true });
+  }
+
+  async link(d) {
+    let body = null;
+    try { body = JSON.parse(new TextDecoder().decode(unb64u(d))); } catch {}
+    let ok = false, sent = false;
+    if (body) {
+      const res = await this.subscribe(body);
+      ok = res.status === 200;
+      if (ok) {
+        const rec = await this.ctx.storage.get(SUB_PREFIX + await idOf(body.subscription.endpoint));
+        const st = rec && await this.send(rec, { title: "تم تفعيل الإشعارات", body: "ستصلك تنبيهات الصلاة هنا بإذن الله · " + (rec.prefs.name || ""), tag: "test" }).catch(() => 0);
+        sent = st >= 200 && st < 300;
+      }
+    }
+    const msg = ok ? (sent ? "تم تفعيل الإشعارات ✓<br><small>وصلك إشعار تجريبي. يمكنك الرجوع إلى التطبيق.</small>" : "تم حفظ الاشتراك ✓<br><small>ارجع إلى التطبيق.</small>")
+      : "تعذّر التفعيل<br><small>ارجع إلى التطبيق وحاول مرة أخرى.</small>";
+    const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>مواقيت</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0A1311;color:#E7EFEC;font:600 24px/1.6 system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box}small{font-size:16px;font-weight:400;color:#8FA09B}</style></head>
+<body><div>${msg}</div></body></html>`;
+    return new Response(html, { status: ok ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
   }
 
   async tick(now) {
