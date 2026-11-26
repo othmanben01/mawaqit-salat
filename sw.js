@@ -1,5 +1,5 @@
 // Service worker: shows push notifications and keeps the app usable offline.
-const CACHE = "mawaqit-v10";
+const CACHE = "mawaqit-v11";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-180.png", "./icons/badge-96.png"];
 
 self.addEventListener("install", e => {
@@ -35,10 +35,12 @@ self.addEventListener("push", e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : "" }; }
   const title = d.title || "مواقيت الصلاة";
+  // A unique tag for every notification: on iPhone, a notification that replaces
+  // one with the same tag arrives silently (no sound, no vibration).
   e.waitUntil(self.registration.showNotification(title, {
     body: d.body || "",
-    tag: d.tag || "salat",
-    renotify: true,
+    tag: (d.tag || "salat") + "-" + Date.now(),
+    silent: false,
     icon: "icons/icon-192.png",
     badge: "icons/badge-96.png",
     lang: "ar", dir: "rtl",
