@@ -461,8 +461,8 @@ const store = {
 };
 const FIRST_RUN = store.get("settings", null) === null;
 const DEFAULTS = {city:"casa", gps:null, custom:null, method:"auto", asr:1, adj:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},
-  hijriAdj:0, h12:false, tzFix:0, push:{on:false}, bgAdhan:false,
-  notify:{on:false, tone:"adhan", adhanId:"makkah", before:0, athkar:true, friday:true, per:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}}};
+  hijriAdj:0, h12:false, tzFix:0, push:{on:false}, bgAdhan:true,
+  notify:{on:true, tone:"adhan", adhanId:"makkah", before:0, athkar:true, friday:true, per:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}}};
 let S = Object.assign({}, DEFAULTS, store.get("settings", {}));
 S.adj = Object.assign({}, DEFAULTS.adj, S.adj||{});
 S.push = Object.assign({}, DEFAULTS.push, S.push||{});
@@ -471,6 +471,8 @@ S.notify.per = Object.assign({}, DEFAULTS.notify.per, S.notify.per||{});
 if(S.notify.sound===false && !store.get("toneSet",false)) S.notify.tone="none";
 delete S.notify.sound;
 if(!["adhan","chime","none"].includes(S.notify.tone)) S.notify.tone="adhan";
+// Athan with the phone locked is on by default (once, for people who already had settings saved).
+if(!store.get("bgDefault1",false)){ S.bgAdhan=true; S.notify.on=true; S.notify.tone="adhan"; store.set("bgDefault1",true); store.set("settings",S); }
 const save = () => { store.set("settings", S); schedulePushSync(); };
 const IN_FRAME = (()=>{ try{ return window.self!==window.top; }catch(e){ return true; } })();
 const DEVICE_TZ = (()=>{ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }catch(e){ return "UTC"; } })();
@@ -943,7 +945,7 @@ function viewSettings(){
   <p class="note" style="text-align:center;margin:0">الإصدار ${APP_VERSION}</p>`;
 }
 
-const APP_VERSION="14";
+const APP_VERSION="15";
 function render(){
   renderHero();
   const v=document.getElementById("view");
@@ -1098,7 +1100,7 @@ function stopWait(){ if(adhan.el && adhan.kind==="silence"){ adhan.switching=tru
 function bgStatusHtml(){
   if(!S.bgAdhan) return "";
   return adhan.bg ? `<div id="bgStatus" class="bgst on"><i></i>الأذان في الخلفية يعمل · لا تغلق التطبيق بالسحب</div>`
-    : `<button id="bgStatus" class="bgst off" data-bg-start>اضغط لتشغيل الأذان في الخلفية</button>`;
+    : `<button id="bgStatus" class="bgst off" data-bg-start>المس الشاشة لتشغيل الأذان في الخلفية</button>`;
 }
 function bgUI(){ const el=document.getElementById("bgStatus"); if(el) el.outerHTML=bgStatusHtml(); }
 function syncAdhanUI(){
@@ -1263,7 +1265,7 @@ async function enablePush(){
       pushBusy=false; render(); return;
     }
     const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
-    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v14]", true);
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v15]", true);
   }
   pushBusy=false; render();
 }
@@ -1279,7 +1281,8 @@ async function testPush(delay){
   if(!pushSub) return;
   if(!delay){ S.notify.on=true; store.set("settings",S); ensureAudio(); const n=nextPrayer(); fire("حان وقت صلاة "+PNAME[n.k], loc.name+" · تجربة", true); }
   // With background mode on, the app itself plays the Athan after the delay, even with the phone locked.
-  if(delay && S.bgAdhan && adhan.bg) setTimeout(()=>{ const n=nextPrayer(); fire("حان وقت صلاة "+PNAME[n.k], loc.name+" · تجربة", true); }, delay*1000);
+  if(delay && S.bgAdhan && !adhan.bg) startWait();
+  if(delay && S.bgAdhan) setTimeout(()=>{ const n=nextPrayer(); fire("حان وقت صلاة "+PNAME[n.k], loc.name+" · تجربة", true); }, delay*1000);
   setPushMsg(delay?"أقفل الهاتف الآن…":"جارٍ إرسال الإشعار…"); render();
   try{ const r=await api("test",{endpoint:pushSub.endpoint,delay});
     if(delay) setPushMsg(S.bgAdhan&&adhan.bg?"وصلك الإشعار والأذان؟ إن لم تسمع الأذان فتحقق من أن الشريط الأزرق «الأذان في الخلفية يعمل» ظاهر.":"وصلك الإشعار؟ لسماع الأذان والهاتف مقفل فعّل «الأذان والهاتف مقفل».");
