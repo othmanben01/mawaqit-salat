@@ -35,9 +35,19 @@ Le dossier `worker/` contient un petit serveur gratuit (Cloudflare Workers) qui 
 
 Chaque modification du dossier `worker/` sur GitHub redéploie le serveur automatiquement.
 
-## Ajouter l'Athan (quand l'app est ouverte)
-- Dans l'app : Réglages → « الأذان » → « اختيار ملف », puis choisir un fichier audio (mp3) sur le téléphone.
-- Pour tout le monde : déposer un fichier nommé `adhan.mp3` à côté de `index.html` dans ce dépôt.
+## Athan (quand l'app est ouverte)
+Réglages → « الأذان » : 6 enregistrements au choix, écoute en touchant la ligne, ou « إضافة ملف من هاتفي » pour ton propre fichier.
+
+| Fichier | Enregistrement | Auteur / source | Licence |
+|---|---|---|---|
+| `sounds/adhan-makkah.mp3` | Adhan, Great Mosque of Mecca (21 Jan 2013) | Seyfula Islam, Wikimedia Commons | CC BY 3.0 |
+| `sounds/adhan-madinah.mp3` | Call to prayer from the Prophet's Mosque | ejaz215, Freesound / Wikimedia Commons | CC BY 3.0 |
+| `sounds/adhan-marrakech.mp3` | Call to Prayer – Marrakech | brightonmatt2, Freesound | CC0 |
+| `sounds/adhan-calm.mp3` | Beautiful adhan | Adam-synagda, Wikimedia Commons | CC0 |
+| `sounds/adhan-short.mp3` | The Adhan – Aaqib Azeez | Atcovi, Wikimedia Commons | CC BY-SA 4.0 |
+| `sounds/adhan-tarteel.mp3` | الأذان (Call to Prayer) | sonically_sound, Freesound | CC0 |
+
+Fichiers convertis en MP3 mono 96 kb/s avec volume normalisé (repris des projets libres `geda22012/noor` et `marwan313/marsathan-adhan`). Les versions adaptées restent sous la licence d'origine.
 
 Les notifications push utilisent le son du téléphone : iOS ne permet pas à une app web de jouer l'Athan quand elle est fermée.
 

@@ -1,5 +1,5 @@
 // Service worker: shows push notifications and keeps the app usable offline.
-const CACHE = "mawaqit-v4";
+const CACHE = "mawaqit-v5";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-180.png", "./icons/badge-96.png"];
 
 self.addEventListener("install", e => {
@@ -19,7 +19,7 @@ self.addEventListener("fetch", e => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
-  if (url.pathname.endsWith("/config.json")) return;
+  if (url.pathname.endsWith("/config.json") || url.pathname.endsWith(".mp3")) return;
   e.respondWith((async () => {
     try {
       const res = await fetch(req, { cache: "no-cache" });

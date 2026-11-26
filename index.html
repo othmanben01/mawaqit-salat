@@ -246,6 +246,16 @@ select,input[type=text],input[type=number],input[type=search]{background:var(--s
 .steps li{display:flex;gap:10px;align-items:flex-start;font-size:14px;counter-increment:s}
 .steps li::before{content:counter(s);width:26px;height:26px;border-radius:9px;background:var(--soft);color:var(--accent);font-weight:700;display:grid;place-items:center;flex:none;font-size:13px}
 .ios-share{display:inline-block;vertical-align:-3px}
+.alist{display:flex;flex-direction:column;background:var(--soft);border-radius:14px;padding:4px;margin-top:4px}
+.arow{display:flex;align-items:center;gap:12px;border:0;background:transparent;border-radius:11px;padding:10px;text-align:start;width:100%}
+.arow b{display:block;font-size:15px}
+.arow small{display:block;font-size:12px;color:var(--muted)}
+.arow .rad{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);flex:none;box-sizing:border-box}
+.arow[aria-checked="true"]{background:var(--surface)}
+.arow[aria-checked="true"] .rad{border:6px solid var(--accent)}
+.arow .pl{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:none}
+.arow.playing .pl{background:var(--accent);color:var(--on-accent)}
+.credits{margin:0 0 12px;padding-inline-start:18px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
 .adhan-box{display:flex;flex-direction:column;gap:8px;margin-top:4px}
 .adhan-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .file-btn{position:relative;overflow:hidden}
@@ -432,7 +442,7 @@ const store = {
 const FIRST_RUN = store.get("settings", null) === null;
 const DEFAULTS = {city:"casa", gps:null, custom:null, method:"auto", asr:1, adj:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},
   hijriAdj:0, h12:false, tzFix:0, push:{on:false},
-  notify:{on:false, tone:"adhan", before:0, athkar:true, friday:true, per:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}}};
+  notify:{on:false, tone:"adhan", adhanId:"makkah", before:0, athkar:true, friday:true, per:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}}};
 let S = Object.assign({}, DEFAULTS, store.get("settings", {}));
 S.adj = Object.assign({}, DEFAULTS.adj, S.adj||{});
 S.push = Object.assign({}, DEFAULTS.push, S.push||{});
@@ -895,14 +905,7 @@ function viewSettings(){
       <div class="seg" role="radiogroup" aria-label="صوت التنبيه">
         ${[["adhan","الأذان"],["chime","نغمة"],["none","صامت"]].map(([v,l])=>`<button role="radio" data-tone="${v}" aria-selected="${S.notify.tone===v}" aria-checked="${S.notify.tone===v}">${l}</button>`).join("")}
       </div>
-      ${S.notify.tone==="adhan"?`<div class="adhan-box">
-        <span class="small ${adhan.src?"":"muted"}" id="adhanLbl">${adhanLabel()}</span>
-        <div class="adhan-btns">
-          <button class="btn soft" data-adhan-play ${adhan.src?"":"disabled"}>${adhan.playing?"إيقاف":"استماع"}</button>
-          <label class="btn soft file-btn">اختيار ملف<input type="file" id="adhanFile" accept="audio/*"></label>
-          ${adhan.from==="mine"?`<button class="link small" data-adhan-clear>حذف ملفي</button>`:""}
-        </div>
-      </div>`:""}
+      ${S.notify.tone==="adhan"?adhanPicker():""}
       <span class="note">إشعار الهاتف يستعمل صوت النظام. صوت الأذان يعمل عندما يكون التطبيق مفتوحاً.</span>
     </div>
   </section>
@@ -1024,43 +1027,71 @@ function chime(){ if(!audioCtx) return; try{ const t0=audioCtx.currentTime;
   [523.25,659.25,783.99,1046.5,783.99].forEach((f,i)=>{ const o=audioCtx.createOscillator(), g=audioCtx.createGain(), st=t0+i*0.42;
     o.type="sine"; o.frequency.value=f; g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(0.22,st+0.04); g.gain.exponentialRampToValueAtTime(0.0001,st+1.8);
     o.connect(g); g.connect(audioCtx.destination); o.start(st); o.stop(st+1.9); }); }catch(e){} }
-const adhan={src:null, from:null, name:"", el:null, playing:false, unlocked:false};
+/* ---- Adhan recordings (freely licensed, see credits) + the viewer's own file ---- */
+const ADHANS=[
+  {id:"makkah", n:"الحرم المكي", d:"المسجد الحرام · 3:17", f:"sounds/adhan-makkah.mp3", c:"Adhan, Great Mosque of Mecca (21 Jan 2013) — Seyfula Islam, Wikimedia Commons · CC BY 3.0"},
+  {id:"madinah", n:"المسجد النبوي", d:"المدينة المنورة · 3:07", f:"sounds/adhan-madinah.mp3", c:"Call to prayer from the Prophet's Mosque — ejaz215, Freesound / Wikimedia Commons · CC BY 3.0"},
+  {id:"marrakech", n:"مراكش", d:"أذان من المغرب · 2:18", f:"sounds/adhan-marrakech.mp3", c:"Call to Prayer – Marrakech — brightonmatt2, Freesound · CC0"},
+  {id:"calm", n:"أذان هادئ", d:"صوت واحد صافٍ · 2:34", f:"sounds/adhan-calm.mp3", c:"Beautiful adhan — Adam-synagda, Wikimedia Commons · CC0"},
+  {id:"short", n:"أذان قصير", d:"على السنّة دون تمطيط · 1:27", f:"sounds/adhan-short.mp3", c:"The Adhan – Aaqib Azeez — Atcovi, Wikimedia Commons · CC BY-SA 4.0"},
+  {id:"tarteel", n:"أذان مرتّل", d:"طويل وبطيء · 4:21", f:"sounds/adhan-tarteel.mp3", c:"الأذان (Call to Prayer) — sonically_sound, Freesound · CC0"},
+];
+const adhan={src:null, from:null, name:"", el:null, playing:false, unlocked:false, mine:null};
+const playIc=`<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>`;
+const stopIc=`<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/></svg>`;
 function adhanEl(){
-  if(!adhan.el){ const a=new Audio(); a.preload="auto";
+  if(!adhan.el){ const a=new Audio(); a.preload="none";
     a.addEventListener("ended",()=>{ adhan.playing=false; syncAdhanUI(); });
     a.addEventListener("pause",()=>{ adhan.playing=false; syncAdhanUI(); });
     a.addEventListener("play",()=>{ if(!a.muted){ adhan.playing=true; syncAdhanUI(); } });
     adhan.el=a; }
   return adhan.el;
 }
-function adhanLabel(){
-  if(adhan.from==="mine") return "ملفك: "+adhan.name;
-  if(adhan.from==="site") return "الأذان المرفق بالتطبيق";
-  return "لا يوجد ملف أذان بعد. اختر ملفاً صوتياً (mp3) من هاتفك.";
-}
 function syncAdhanUI(){
-  const b=document.querySelector("[data-adhan-play]"); if(b) b.textContent=adhan.playing?"إيقاف":"استماع";
+  document.querySelectorAll("[data-adhan-pick]").forEach(b=>{ const on=adhan.playing && b.dataset.adhanPick===S.notify.adhanId;
+    const i=b.querySelector(".pl"); if(i) i.innerHTML=on?stopIc:playIc; b.classList.toggle("playing",on); });
   const t=document.querySelector(".toast [data-stop]"); if(t && !adhan.playing) t.textContent="حسناً";
+}
+function adhanPicker(){
+  const rows=ADHANS.map(a=>({id:a.id,n:a.n,d:a.d}));
+  if(adhan.mine) rows.push({id:"mine",n:"ملفي",d:adhan.mine.name});
+  return `<div class="alist" role="radiogroup" aria-label="صوت الأذان">${rows.map(r=>{ const sel=S.notify.adhanId===r.id, on=sel&&adhan.playing;
+    return `<button class="arow ${on?"playing":""}" role="radio" aria-checked="${sel}" data-adhan-pick="${r.id}">
+      <span class="rad"></span><span class="grow"><b>${esc(r.n)}</b><small>${esc(r.d)}</small></span><span class="pl">${on?stopIc:playIc}</span></button>`; }).join("")}</div>
+    <div class="adhan-btns">
+      <label class="btn soft file-btn">إضافة ملف من هاتفي<input type="file" id="adhanFile" accept="audio/*"></label>
+      ${adhan.mine?`<button class="link small" data-adhan-clear>حذف ملفي</button>`:""}
+    </div>
+    <details class="more"><summary class="small">حقوق التسجيلات</summary><ul class="credits">${ADHANS.map(a=>`<li><b>${a.n}</b>: <span dir="ltr">${esc(a.c)}</span></li>`).join("")}</ul></details>`;
 }
 function idb(){ return new Promise((res,rej)=>{ try{ const r=indexedDB.open("salat",1);
   r.onupgradeneeded=()=>r.result.createObjectStore("files"); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }catch(e){ rej(e); } }); }
 async function idbDo(mode,fn){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction("files",mode), st=tx.objectStore("files"), r=fn(st);
   tx.oncomplete=()=>res(r&&r.result); tx.onerror=()=>rej(tx.error); }); }
-function setAdhanSrc(src,from,name){ if(adhan.src && adhan.from==="mine" && adhan.src!==src){ try{ URL.revokeObjectURL(adhan.src); }catch(e){} }
-  adhan.src=src; adhan.from=from; adhan.name=name||""; adhan.unlocked=false; const a=adhanEl(); a.src=src||""; }
+function setAdhanSrc(src,from,name){
+  adhan.from=from; adhan.name=name||"";
+  if(adhan.src===src) return;
+  adhan.src=src; adhan.unlocked=false; const a=adhanEl(); a.src=src||""; }
+function applyAdhan(){
+  const id=S.notify.adhanId;
+  if(id==="mine" && adhan.mine) setAdhanSrc(adhan.mine.url,"mine",adhan.mine.name);
+  else { const a=ADHANS.find(x=>x.id===id)||ADHANS[0]; if(id==="mine") S.notify.adhanId=a.id; setAdhanSrc(a.f,"site",a.n); }
+}
 async function loadAdhan(){
-  try{ const rec=await idbDo("readonly",st=>st.get("adhan")); if(rec&&rec.blob){ setAdhanSrc(URL.createObjectURL(rec.blob),"mine",rec.name); return; } }catch(e){}
-  try{ const r=await fetch("adhan.mp3",{method:"HEAD",cache:"no-store"}); const ct=r.headers.get("content-type")||"";
-    if(r.ok && !/html/.test(ct)) setAdhanSrc("adhan.mp3","site"); }catch(e){}
+  try{ const rec=await idbDo("readonly",st=>st.get("adhan")); if(rec&&rec.blob) adhan.mine={url:URL.createObjectURL(rec.blob),name:rec.name}; }catch(e){}
+  applyAdhan();
 }
 async function saveAdhanFile(file){
   if(!file) return;
   if(file.size>25*1024*1024){ toast("الملف كبير جداً","اختر ملفاً أقل من 25 ميغابايت."); return; }
   try{ await idbDo("readwrite",st=>st.put({blob:file,name:file.name},"adhan")); }catch(e){}
-  setAdhanSrc(URL.createObjectURL(file),"mine",file.name); render();
+  if(adhan.mine) try{ URL.revokeObjectURL(adhan.mine.url); }catch(e){}
+  adhan.mine={url:URL.createObjectURL(file),name:file.name};
+  stopAdhan(); S.notify.adhanId="mine"; save(); applyAdhan(); render();
 }
 async function clearAdhanFile(){ try{ await idbDo("readwrite",st=>st.delete("adhan")); }catch(e){}
-  stopAdhan(); setAdhanSrc(null,null,""); await loadAdhan(); render(); }
+  stopAdhan(); if(adhan.mine) try{ URL.revokeObjectURL(adhan.mine.url); }catch(e){}
+  adhan.mine=null; if(S.notify.adhanId==="mine"){ S.notify.adhanId=ADHANS[0].id; save(); } applyAdhan(); render(); }
 // Phones only let a page play audio it has already started from a tap: prime the player on the first tap.
 function unlockAudio(){ ensureAudio(); if(!adhan.src||adhan.unlocked||adhan.playing) return; const a=adhanEl();
   a.muted=true; const p=a.play(); if(p&&p.then) p.then(()=>{ a.pause(); a.currentTime=0; a.muted=false; adhan.unlocked=true; }).catch(()=>{ a.muted=false; }); }
@@ -1204,7 +1235,10 @@ document.getElementById("view").addEventListener("click",e=>{
   if(e.target.closest("[data-push-test]")){ testPush(); return; }
   const pr=e.target.closest("[data-per]"); if(pr){ S.notify.per[pr.dataset.per]=!S.notify.per[pr.dataset.per]; save(); render(); return; }
   const tn=e.target.closest("[data-tone]"); if(tn){ S.notify.tone=tn.dataset.tone; store.set("toneSet",true); save(); if(tn.dataset.tone!=="adhan") stopAdhan(); render(); return; }
-  if(e.target.closest("[data-adhan-play]")){ if(adhan.playing) stopAdhan(); else playAdhan(); return; }
+  const ap=e.target.closest("[data-adhan-pick]");
+  if(ap){ const id=ap.dataset.adhanPick;
+    if(id===S.notify.adhanId && adhan.playing){ stopAdhan(); return; }
+    stopAdhan(); S.notify.adhanId=id; save(); applyAdhan(); playAdhan(); render(); return; }
   if(e.target.closest("[data-adhan-clear]")){ clearAdhanFile(); return; }
   if(e.target.closest("#liveBtn")){ startCompass(); return; }
   const a=e.target.closest("[data-ath]"); if(a){ athTab=a.dataset.ath; render(); return; }
