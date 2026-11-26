@@ -303,6 +303,11 @@ select,input[type=text],input[type=number],input[type=search]{background:var(--s
 .la-ring{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.14);animation:la 2s ease-in-out infinite}
 @keyframes la{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.25)}50%{box-shadow:0 0 0 18px rgba(255,255,255,0)}}
 @media (prefers-reduced-motion: reduce){.la-ring{animation:none}}
+.bgst{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:14px;padding:11px 14px;font-size:13.5px;font-weight:600;box-sizing:border-box}
+.bgst.on{background:var(--accent-soft);color:var(--accent)}
+.bgst.on i{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:bgp 2s ease-in-out infinite}
+.bgst.off{background:var(--gold-soft);color:var(--gold)}
+@keyframes bgp{50%{opacity:.3}}
 .toast{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));z-index:40;
   max-width:520px;margin:0 auto;background:var(--ink);color:var(--bg);border-radius:16px;padding:14px 16px;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .toast div{flex:1;min-width:0}
@@ -456,7 +461,7 @@ const store = {
 };
 const FIRST_RUN = store.get("settings", null) === null;
 const DEFAULTS = {city:"casa", gps:null, custom:null, method:"auto", asr:1, adj:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},
-  hijriAdj:0, h12:false, tzFix:0, push:{on:false},
+  hijriAdj:0, h12:false, tzFix:0, push:{on:false}, bgAdhan:false,
   notify:{on:false, tone:"adhan", adhanId:"makkah", before:0, athkar:true, friday:true, per:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}}};
 let S = Object.assign({}, DEFAULTS, store.get("settings", {}));
 S.adj = Object.assign({}, DEFAULTS.adj, S.adj||{});
@@ -659,6 +664,7 @@ function viewPrayer(){
     `<button class="btn soft block" data-cta-notify>${bellSvg(true).replace('<svg','<svg width="18" height="18"')} فعّل إشعارات الصلاة</button>`;
   return `
   <section class="card">${list}</section>
+  ${bgStatusHtml()}
   ${cta}
   ${friday}
   <section class="card pad">
@@ -916,6 +922,8 @@ function viewSettings(){
   <div class="h">والتطبيق مفتوح</div>
   <section class="card">
     ${sw("n_on",S.notify.on,"تنبيه صوتي داخل التطبيق")}
+    ${sw("bg_on",S.bgAdhan,"الأذان والهاتف مقفل","يبقى التطبيق يعمل في الخلفية بصوت صامت ليؤذّن في وقت الصلاة. يتوقف إذا أغلقته بالسحب أو شغّلت موسيقى أو اتصالاً.")}
+    ${S.bgAdhan?`<div class="field">${bgStatusHtml()}</div>`:""}
     <div class="field"><span class="lbl">الصوت</span>
       <div class="seg" role="radiogroup" aria-label="صوت التنبيه">
         ${[["adhan","الأذان"],["chime","نغمة"],["none","صامت"]].map(([v,l])=>`<button role="radio" data-tone="${v}" aria-selected="${S.notify.tone===v}" aria-checked="${S.notify.tone===v}">${l}</button>`).join("")}
@@ -935,7 +943,7 @@ function viewSettings(){
   <p class="note" style="text-align:center;margin:0">الإصدار ${APP_VERSION}</p>`;
 }
 
-const APP_VERSION="12";
+const APP_VERSION="13";
 function render(){
   renderHero();
   const v=document.getElementById("view");
@@ -1057,14 +1065,42 @@ const ADHANS=[
 const adhan={src:null, from:null, name:"", el:null, playing:false, unlocked:false, mine:null};
 const playIc=`<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>`;
 const stopIc=`<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/></svg>`;
+/* One player for everything. In background mode it loops a silent track ("silence"), which keeps the
+   app running with the phone locked, then switches to the Athan ("athan") at prayer time. */
+const SILENCE="sounds/silence.mp3";
+adhan.kind="athan"; adhan.bg=false; adhan.switching=false;
 function adhanEl(){
   if(!adhan.el){ const a=new Audio(); a.preload="none";
-    a.addEventListener("ended",()=>{ adhan.playing=false; syncAdhanUI(); });
-    a.addEventListener("pause",()=>{ adhan.playing=false; syncAdhanUI(); });
-    a.addEventListener("play",()=>{ if(!a.muted){ adhan.playing=true; syncAdhanUI(); } });
+    a.addEventListener("ended",()=>{ if(adhan.kind!=="athan") return; adhan.playing=false; syncAdhanUI(); if(S.bgAdhan) startWait(); });
+    a.addEventListener("pause",()=>{ if(adhan.switching) return;
+      if(adhan.kind==="athan"){ adhan.playing=false; syncAdhanUI(); } else { adhan.bg=false; bgUI(); } });
+    a.addEventListener("play",()=>{ if(adhan.kind==="athan"){ if(!a.muted){ adhan.playing=true; syncAdhanUI(); } } else { adhan.bg=true; bgUI(); } });
     adhan.el=a; }
   return adhan.el;
 }
+function loadInto(src){ const a=adhanEl(); if(a.dataset.cur!==src){ a.src=src; a.dataset.cur=src; } return a; }
+function setMS(kind){
+  try{ if(!("mediaSession" in navigator) || !loc) return; const n=nextPrayer();
+    navigator.mediaSession.metadata=new MediaMetadata({title: kind==="athan"?"الأذان":"في انتظار الأذان",
+      artist:"مواقيت الصلاة · "+PNAME[n.k]+" "+fmt(n.at), album:loc.name, artwork:[{src:"icons/icon-512.png",sizes:"512x512",type:"image/png"}]});
+    navigator.mediaSession.setActionHandler("play",()=>{ if(S.bgAdhan) startWait(); });
+    navigator.mediaSession.setActionHandler("pause",()=>{ if(adhan.kind==="athan") stopAdhan(); else stopWait(); });
+  }catch(e){} }
+function startWait(){
+  if(!S.bgAdhan) return;
+  const a=adhanEl(); adhan.switching=true; adhan.kind="silence"; loadInto(SILENCE); a.loop=true; a.muted=false; a.volume=1;
+  setMS("wait");
+  const p=a.play();
+  if(p&&p.then) p.then(()=>{ adhan.switching=false; adhan.bg=true; adhan.unlocked=true; bgUI(); })
+    .catch(()=>{ adhan.switching=false; adhan.bg=false; bgUI(); });
+}
+function stopWait(){ if(adhan.el && adhan.kind==="silence"){ adhan.switching=true; adhan.el.pause(); adhan.switching=false; } adhan.bg=false; bgUI(); }
+function bgStatusHtml(){
+  if(!S.bgAdhan) return "";
+  return adhan.bg ? `<div id="bgStatus" class="bgst on"><i></i>الأذان في الخلفية يعمل · لا تغلق التطبيق بالسحب</div>`
+    : `<button id="bgStatus" class="bgst off" data-bg-start>اضغط لتشغيل الأذان في الخلفية</button>`;
+}
+function bgUI(){ const el=document.getElementById("bgStatus"); if(el) el.outerHTML=bgStatusHtml(); }
 function syncAdhanUI(){
   document.querySelectorAll("[data-adhan-pick]").forEach(b=>{ const on=adhan.playing && b.dataset.adhanPick===S.notify.adhanId;
     const i=b.querySelector(".pl"); if(i) i.innerHTML=on?stopIc:playIc; b.classList.toggle("playing",on); });
@@ -1089,7 +1125,7 @@ async function idbDo(mode,fn){ const db=await idb(); return new Promise((res,rej
 function setAdhanSrc(src,from,name){
   adhan.from=from; adhan.name=name||"";
   if(adhan.src===src) return;
-  adhan.src=src; adhan.unlocked=false; const a=adhanEl(); a.src=src||""; }
+  adhan.src=src; adhan.unlocked=false; }
 function applyAdhan(){
   const id=S.notify.adhanId;
   if(id==="mine" && adhan.mine) setAdhanSrc(adhan.mine.url,"mine",adhan.mine.name);
@@ -1113,16 +1149,26 @@ async function clearAdhanFile(){ try{ await idbDo("readwrite",st=>st.delete("adh
 // Phones only let a page play audio it has already started from a tap: prime the player on the first tap.
 function unlockAudio(){
   ensureAudio();
+  if(S.bgAdhan){ if(!adhan.bg && !adhan.playing) startWait(); return; }
   if(!S.notify.on || S.notify.tone!=="adhan" || !adhan.src || adhan.unlocked || adhan.playing) return;
-  const a=adhanEl(); a.muted=true; a.volume=0;
+  adhan.kind="athan"; const a=loadInto(adhan.src); a.loop=false; a.muted=true; a.volume=0;
   const stop=()=>{ if(a.muted){ a.pause(); try{ a.currentTime=0; }catch(e){} } a.muted=false; a.volume=1; };
   const p=a.play(); if(p&&p.then) p.then(()=>{ adhan.unlocked=true; stop(); }).catch(stop);
   setTimeout(()=>{ if(a.muted) stop(); },400);
 }
 document.addEventListener("pointerdown",unlockAudio,true);
-function playAdhan(){ if(!adhan.src){ chime(); return; } const a=adhanEl(); a.muted=false; a.volume=1; a.currentTime=0;
-  const p=a.play(); if(p&&p.catch) p.catch(()=>{ adhan.playing=false; chime(); }); }
-function stopAdhan(){ if(adhan.el){ adhan.el.pause(); try{ adhan.el.currentTime=0; }catch(e){} } adhan.playing=false; syncAdhanUI(); }
+function playAdhan(){ if(!adhan.src){ chime(); return; }
+  const a=adhanEl(); adhan.switching=true; adhan.kind="athan"; loadInto(adhan.src); a.loop=false; a.muted=false; a.volume=1;
+  try{ a.currentTime=0; }catch(e){}
+  setMS("athan");
+  const p=a.play();
+  if(p&&p.then) p.then(()=>{ adhan.switching=false; adhan.playing=true; syncAdhanUI(); })
+    .catch(()=>{ adhan.switching=false; adhan.playing=false; chime(); if(S.bgAdhan) startWait(); }); }
+function stopAdhan(){
+  const wasAthan=adhan.kind==="athan";
+  if(adhan.el && wasAthan){ adhan.switching=true; adhan.el.pause(); try{ adhan.el.currentTime=0; }catch(e){} adhan.switching=false; }
+  adhan.playing=false; syncAdhanUI();
+  if(S.bgAdhan && wasAthan) startWait(); }
 function toast(title,body,stoppable){ document.querySelectorAll(".toast").forEach(x=>x.remove());
   const el=document.createElement("div"); el.className="toast"; el.setAttribute("role","alert"); el.setAttribute("dir","rtl");
   el.innerHTML=`<div><b></b><span></span></div><button data-stop>${stoppable?"إيقاف الأذان":"حسناً"}</button>`; el.querySelector("b").textContent=title; el.querySelector("span").textContent=body;
@@ -1149,7 +1195,7 @@ function checkNotify(){ if(!S.notify.on) return; const day=today.join("-"), ev=[
     if(+S.notify.before>0) ev.push({at:T[k]-S.notify.before/60,key:day+k+"b",t:PNAME[k]+" بعد "+S.notify.before+" دقائق",b:"الأذان على الساعة "+fmt(T[k])}); }
   if(S.notify.athkar){ ev.push({at:T.fajr+20/60,key:day+"am",t:"أذكار الصباح",b:"وقتها حتى الشروق "+fmt(T.sunrise)});
     ev.push({at:T.asr+20/60,key:day+"pm",t:"أذكار المساء",b:"وقتها حتى المغرب "+fmt(T.maghrib)}); }
-  for(const e of ev) if(nowH>=e.at && nowH<e.at+2/60 && !fired.has(e.key)){ fired.add(e.key); fire(e.t,e.b,e.adhan); } }
+  for(const e of ev) if(nowH>=e.at && nowH<e.at+5/60 && !fired.has(e.key)){ fired.add(e.key); fire(e.t,e.b,e.adhan); } }
 
 /* ================= Push notifications (work with the app closed) ================= */
 const CFG={pushApi:"", publicKey:""};
@@ -1217,7 +1263,7 @@ async function enablePush(){
       pushBusy=false; render(); return;
     }
     const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
-    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v12]", true);
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v13]", true);
   }
   pushBusy=false; render();
 }
@@ -1309,6 +1355,7 @@ document.getElementById("view").addEventListener("click",e=>{
     const st=pushState(); if(st==="off"){ enablePush(); return; }
     go("settings"); setTimeout(()=>{ const h=document.getElementById("notifH"); if(h) h.scrollIntoView({behavior:"smooth"}); },50); return; }
   if(e.target.closest("[data-push-on]")){ enablePush(); return; }
+  if(e.target.closest("[data-bg-start]")){ startWait(); return; }
   if(e.target.closest("[data-push-link]")){
     // The link opens Safari, which saves the subscription and sends a test notification.
     setTimeout(()=>{ S.push.on=true; S.notify.on=true; store.set("settings",S); store.set("pushSent",{p:JSON.stringify(pushPrefs()),at:Date.now()});
@@ -1345,6 +1392,9 @@ document.getElementById("view").addEventListener("change",e=>{
   else if(el.dataset.adj) S.adj[el.dataset.adj]=Math.max(-60,Math.min(60,parseInt(el.value)||0));
   else if(el.id==="n_on"){ S.notify.on=el.checked; if(el.checked){ ensureAudio(); unlockAudio(); } }
   else if(el.id==="adhanFile"){ saveAdhanFile(el.files&&el.files[0]); return; }
+  else if(el.id==="bg_on"){ S.bgAdhan=el.checked;
+    if(el.checked){ S.notify.on=true; S.notify.tone="adhan"; ensureAudio(); startWait(); } else stopWait();
+    save(); render(); return; }
   else if(el.id==="tzfix") S.tzFix=+el.value;
   else if(el.id==="n_ath") S.notify.athkar=el.checked;
   else if(el.id==="n_fri") S.notify.friday=el.checked;
@@ -1362,9 +1412,9 @@ function updateNow(){ const p=localNow(loc.tz); nowH=p.H+p.M/60+p.s/3600;
   const dk=p.y+"-"+p.m+"-"+p.d; if(dk!==today.join("-")){ refreshDay(); return true; }
   const mk=dk+" "+p.H+":"+p.M; if(mk!==lastKey){ lastKey=mk; return true; } return false; }
 function full(){ refreshDay(); updateNow(); render(); tick(); }
-setInterval(()=>{ if(updateNow()){ if(tab==="prayer"){ const y=SC().scrollTop; render(); SC().scrollTop=y; } else renderHero(); checkNotify(); } tick(); }, 1000);
+setInterval(()=>{ if(updateNow()){ if(adhan.bg && adhan.kind==="silence") setMS("wait"); if(tab==="prayer"){ const y=SC().scrollTop; render(); SC().scrollTop=y; } else renderHero(); checkNotify(); } tick(); }, 1000);
 // Coming back to the app (iPhone keeps it frozen in the background): refresh right away.
-function silenceAll(){ stopAdhan(); document.querySelectorAll(".live-adhan").forEach(x=>x.remove()); }
+function silenceAll(){ if(!S.bgAdhan) stopAdhan(); document.querySelectorAll(".live-adhan").forEach(x=>x.remove()); }
 document.addEventListener("visibilitychange",()=>{ if(document.hidden){ silenceAll(); return; } silenceAll(); full(); quietGPS(); });
 window.addEventListener("pagehide",silenceAll);
 
