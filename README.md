@@ -49,6 +49,9 @@ Réglages → « الأذان » : 6 enregistrements au choix, écoute en toucha
 
 Fichiers convertis en MP3 mono 96 kb/s avec volume normalisé (repris des projets libres `geda22012/noor` et `marwan313/marsathan-adhan`). Les versions adaptées restent sous la licence d'origine.
 
+### Extraits de 30 secondes (sonnerie iPhone)
+`sounds/30s/` contient un extrait de chaque Athan (18 à 30 s, coupé sur une pause naturelle, fondu en fin), à transformer en sonnerie avec GarageBand puis à choisir dans Réglages → Sons et vibrations → Alertes par défaut. Mêmes auteurs et licences que les fichiers complets.
+
 Les notifications push utilisent le son du téléphone : iOS ne permet pas à une app web de jouer l'Athan quand elle est fermée.
 
 ## Notes
