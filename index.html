@@ -931,9 +931,11 @@ function viewSettings(){
     <div class="field"><label for="tzfix">تصحيح الساعة</label><select id="tzfix">${[-1,0,1].map(v=>`<option value="${v}"${+S.tzFix===v?" selected":""}>${v===0?"بدون (تلقائي)":(v>0?"+1 ساعة":"‎-1 ساعة")}</option>`).join("")}</select>
       <span class="note">استعمله فقط إذا ظهرت المواقيت متقدمة أو متأخرة بساعة كاملة.</span></div>
     <div class="field"><label for="hadj">تعديل التاريخ الهجري</label><select id="hadj">${[-2,-1,0,1,2].map(v=>`<option value="${v}"${+S.hijriAdj===v?" selected":""}>${v>0?"+"+v:v} يوم</option>`).join("")}</select></div>
-  </section>`;
+  </section>
+  <p class="note" style="text-align:center;margin:0">الإصدار ${APP_VERSION}</p>`;
 }
 
+const APP_VERSION="12";
 function render(){
   renderHero();
   const v=document.getElementById("view");
@@ -1215,7 +1217,7 @@ async function enablePush(){
       pushBusy=false; render(); return;
     }
     const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
-    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v11]", true);
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v12]", true);
   }
   pushBusy=false; render();
 }
@@ -1229,6 +1231,7 @@ function testLink(delay){ const e=btoa(pushSub.endpoint).replace(/\+/g,"-").repl
   return CFG.pushApi+"/api/testlink?e="+e+"&delay="+delay; }
 async function testPush(delay){
   if(!pushSub) return;
+  if(!delay){ S.notify.on=true; store.set("settings",S); ensureAudio(); const n=nextPrayer(); fire("حان وقت صلاة "+PNAME[n.k], loc.name+" · تجربة", true); }
   setPushMsg(delay?"جارٍ جدولة التجربة…":"جارٍ إرسال الإشعار…"); render();
   try{ const r=await api("test",{endpoint:pushSub.endpoint,delay});
     if(delay) setPushMsg("سيصلك إشعار الأذان خلال دقيقة أو دقيقتين. أغلق التطبيق وقفل الهاتف الآن.");
@@ -1249,7 +1252,7 @@ async function syncPush(force){
 async function initPush(){
   await loadConfig();
   if(!IN_FRAME && "serviceWorker" in navigator){
-    try{ swReg=await navigator.serviceWorker.register("sw.js"); }catch(e){}
+    try{ swReg=await navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}); swReg.update().catch(()=>{}); }catch(e){}
     if(swReg && PUSH_OK){ try{ pushSub=await swReg.pushManager.getSubscription(); }catch(e){} }
     if(S.push.on && !pushSub){ S.push.on=false; store.set("settings",S); setPushMsg("توقفت الإشعارات. اضغط «تفعيل» من جديد.",true); }
     if(S.push.on && pushSub) syncPush(false);
@@ -1277,7 +1280,7 @@ function pushBlock(){
   else body= (pushTestLinks
       ? `<a class="btn block" href="${esc(testLink(0))}" target="_blank" rel="noopener">تجربة إشعار الهاتف الآن (Safari)</a>
          <a class="btn soft block" href="${esc(testLink(60))}" target="_blank" rel="noopener">تجربة بعد دقيقة — ثم أقفل الهاتف</a>`
-      : `<button class="btn block" data-push-test="0" ${pushBusy?"disabled":""}>${bellSvg(true).replace('<svg','<svg width="18" height="18"')} تجربة إشعار الهاتف الآن</button>
+      : `<button class="btn block" data-push-test="0" ${pushBusy?"disabled":""}>${bellSvg(true).replace('<svg','<svg width="18" height="18"')} تجربة الأذان والإشعار الآن</button>
          <button class="btn soft block" data-push-test="60" ${pushBusy?"disabled":""}>تجربة بعد دقيقة — ثم أقفل الهاتف</button>`)
     + `<button class="link small" data-push-off style="align-self:flex-start" ${pushBusy?"disabled":""}>إيقاف إشعارات الهاتف</button>`;
   return `<div class="push">
