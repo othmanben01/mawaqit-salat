@@ -1,6 +1,6 @@
 # Serveur de notifications de l'app « مواقيت الصلاة »
 # Déployé par Cloudflare (Workers Builds) depuis le dossier /worker de ce dépôt.
-name = "mawaqit-salat"
+name = "mawaqit-push"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
 workers_dev = true
