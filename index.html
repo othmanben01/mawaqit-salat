@@ -945,7 +945,7 @@ function viewSettings(){
   <p class="note" style="text-align:center;margin:0">الإصدار ${APP_VERSION}</p>`;
 }
 
-const APP_VERSION="15";
+const APP_VERSION="16";
 function render(){
   renderHero();
   const v=document.getElementById("view");
@@ -1063,6 +1063,11 @@ const ADHANS=[
   {id:"calm", n:"أذان هادئ", d:"صوت واحد صافٍ · 2:34", f:"sounds/adhan-calm.mp3", c:"Beautiful adhan — Adam-synagda, Wikimedia Commons · CC0"},
   {id:"short", n:"أذان قصير", d:"على السنّة دون تمطيط · 1:27", f:"sounds/adhan-short.mp3", c:"The Adhan – Aaqib Azeez — Atcovi, Wikimedia Commons · CC BY-SA 4.0"},
   {id:"tarteel", n:"أذان مرتّل", d:"طويل وبطيء · 4:21", f:"sounds/adhan-tarteel.mp3", c:"الأذان (Call to Prayer) — sonically_sound, Freesound · CC0"},
+  {id:"makkah-maghrib", n:"مغرب الحرم المكي", d:"المسجد الحرام، 2012 · 3:04", f:"sounds/adhan-makkah-maghrib.mp3", c:"Maghrib Adhan at the Masjid al Haram (25 Feb 2012) — 3omar Faruq, Wikimedia Commons · CC BY 3.0 (extrait 1:52–4:56)"},
+  {id:"alquds", n:"القدس", d:"المدينة القديمة · 1:41", f:"sounds/adhan-alquds.mp3", c:"Israel_sanctum_sepulchrum_adhan — Zabuhailo, Freesound 191866 · CC BY 4.0"},
+  {id:"alexandria", n:"الإسكندرية", d:"تسجيل من المدينة · 2:58", f:"sounds/adhan-alexandria.mp3", c:"Muezzin 1 — CyWeb, Freesound 256188 · CC BY 4.0"},
+  {id:"alexandria-short", n:"الإسكندرية (قصير)", d:"0:54", f:"sounds/adhan-alexandria-short.mp3", c:"Alexandria mosque call to prayer — nervousneal, Freesound 341762 · CC0"},
+  {id:"khalili", n:"القاهرة — خان الخليلي", d:"أذان المدينة من فوق السطح · 3:44", f:"sounds/adhan-cairo-khalili.mp3", c:"Call to prayer (Khan El Khalili rooftop) — 3bagbrew, Freesound 511003 · CC0 (extrait 1:28–5:12)"},
 ];
 const adhan={src:null, from:null, name:"", el:null, playing:false, unlocked:false, mine:null};
 const playIc=`<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>`;
@@ -1265,7 +1270,7 @@ async function enablePush(){
       pushBusy=false; render(); return;
     }
     const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
-    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v15]", true);
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v16]", true);
   }
   pushBusy=false; render();
 }

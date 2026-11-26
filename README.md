@@ -46,8 +46,13 @@ Réglages → « الأذان » : 6 enregistrements au choix, écoute en toucha
 | `sounds/adhan-calm.mp3` | Beautiful adhan | Adam-synagda, Wikimedia Commons | CC0 |
 | `sounds/adhan-short.mp3` | The Adhan – Aaqib Azeez | Atcovi, Wikimedia Commons | CC BY-SA 4.0 |
 | `sounds/adhan-tarteel.mp3` | الأذان (Call to Prayer) | sonically_sound, Freesound | CC0 |
+| `sounds/adhan-makkah-maghrib.mp3` | Maghrib Adhan at the Masjid al Haram, 25 Feb 2012 (extrait 1:52–4:56) | 3omar Faruq, Wikimedia Commons | CC BY 3.0 |
+| `sounds/adhan-alquds.mp3` | Israel_sanctum_sepulchrum_adhan (Freesound 191866) | Zabuhailo | CC BY 4.0 |
+| `sounds/adhan-alexandria.mp3` | Muezzin 1 (Freesound 256188) | CyWeb | CC BY 4.0 |
+| `sounds/adhan-alexandria-short.mp3` | Alexandria mosque call to prayer (Freesound 341762) | nervousneal | CC0 |
+| `sounds/adhan-cairo-khalili.mp3` | Call to prayer, Khan El Khalili rooftop (Freesound 511003, extrait 1:28–5:12) | 3bagbrew | CC0 |
 
-Fichiers convertis en MP3 mono 96 kb/s avec volume normalisé (repris des projets libres `geda22012/noor` et `marwan313/marsathan-adhan`). Les versions adaptées restent sous la licence d'origine.
+Fichiers convertis en MP3 mono 96 kb/s avec volume normalisé (repris des projets libres `geda22012/noor`, `marwan313/marsathan-adhan` et `SultanAlmarri/Noor-Islamic-Smartwatch`). Licences Freesound telles qu'indexées par Openverse. Les versions adaptées restent sous la licence d'origine.
 
 ### Extraits de 30 secondes (sonnerie iPhone)
 `sounds/30s/` contient un extrait de chaque Athan (18 à 30 s, coupé sur une pause naturelle, fondu en fin), à transformer en sonnerie avec GarageBand puis à choisir dans Réglages → Sons et vibrations → Alertes par défaut. Mêmes auteurs et licences que les fichiers complets.
