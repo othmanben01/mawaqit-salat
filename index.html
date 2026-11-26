@@ -15,16 +15,16 @@
 /* Palette: calm, serene blues. Layout: one calm column; a sky-tinted hero that follows the current prayer, white cards, 5-tab bottom bar */
 :root{
   --bg:#F3F6FA; --surface:#FFFFFF; --soft:#EAF0F7; --ink:#15233A; --muted:#66758C; --line:#DFE7F1;
-  --accent:#3B6EA8; --on-accent:#FFFFFF; --accent-soft:#E2ECF8; --ok:#2E8BC0; --warn:#C0574A; --gold:#9A7B3C; --gold-soft:#F4EFE3;
+  --accent:#3B6EA8; --on-accent:#FFFFFF; --accent-soft:#E2ECF8; --ok:#2E8BC0; --warn:#C0574A; --gold:#9A7B3C; --gold-soft:#F4EFE3; --prime:#C79A2B; --prime-soft:#F7EDD2; --late:#C27A45;
   --ui:"IBM Plex Sans Arabic","Segoe UI",Tahoma,system-ui,sans-serif;
   --text:"Amiri","Traditional Arabic","Times New Roman",serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0B1422; --surface:#121D2E; --soft:#182538; --ink:#E6EDF7; --muted:#8C9AB0; --line:#1F2C42;
-  --accent:#7EB1E8; --on-accent:#0A1628; --accent-soft:#162A44; --ok:#6CB8E6; --warn:#E58A7B; --gold:#D3B26E; --gold-soft:#262214; color-scheme:dark}}
+  --accent:#7EB1E8; --on-accent:#0A1628; --accent-soft:#162A44; --ok:#6CB8E6; --warn:#E58A7B; --gold:#D3B26E; --gold-soft:#262214; --prime:#E3BD57; --prime-soft:#2E2610; --late:#E09A68; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0B1422; --surface:#121D2E; --soft:#182538; --ink:#E6EDF7; --muted:#8C9AB0; --line:#1F2C42;
-  --accent:#7EB1E8; --on-accent:#0A1628; --accent-soft:#162A44; --ok:#6CB8E6; --warn:#E58A7B; --gold:#D3B26E; --gold-soft:#262214; color-scheme:dark}
+  --accent:#7EB1E8; --on-accent:#0A1628; --accent-soft:#162A44; --ok:#6CB8E6; --warn:#E58A7B; --gold:#D3B26E; --gold-soft:#262214; --prime:#E3BD57; --prime-soft:#2E2610; --late:#E09A68; color-scheme:dark}
 
 :root{padding-top:env(safe-area-inset-top,0px)}
 html,body{background:var(--bg)}
@@ -96,32 +96,38 @@ input[type=number]{-moz-appearance:textfield}
 .chk-sp{width:30px;flex:none}
 .chk.open{border-color:var(--accent)}
 .chk.on{background:var(--ok);border-color:var(--ok);color:#fff}
-.chk.late{background:var(--gold);border-color:var(--gold);color:#fff}
+.chk.late{background:var(--late);border-color:var(--late);color:#fff}
+.chk.gold{background:linear-gradient(135deg,var(--prime),color-mix(in srgb,var(--prime) 70%,#fff));border-color:var(--prime);color:#fff;box-shadow:0 0 0 4px var(--prime-soft)}
+.chk.open.prime{border-color:var(--prime)}
+.hint-prime{color:var(--prime)!important;font-weight:600}
 .chk.miss{border-style:dashed;border-color:var(--line)}
 .p .nm small.hint-open{color:var(--accent);font-weight:600}
 .sbig{display:flex;align-items:center;gap:16px;padding:6px 0}
 .ring.big{width:86px;height:86px}.ring.big span{width:70px;height:70px;font-size:20px}
 .scards{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
 .scards div{background:var(--surface);border-radius:14px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:2px}
-.scards b{font-size:22px;color:var(--accent)}.scards .late b{color:var(--gold)}.scards .miss b{color:var(--muted)}
+.scards b{font-size:22px;color:var(--accent)}.scards .late b{color:var(--late)}.scards .gold b{color:var(--prime)}.scards .gold{background:var(--prime-soft)}.scards .miss b{color:var(--muted)}
 .scards span{font-size:12px;color:var(--muted)}
+.scards.c4{grid-template-columns:repeat(4,1fr);gap:6px}.scards.c4 div{padding:10px 4px}.scards.c4 b{font-size:20px}.scards.c4 span{font-size:11px;text-align:center}
 .stats-body{overflow-y:auto;display:flex;flex-direction:column;gap:12px;min-height:0}
 .pbars{display:flex;flex-direction:column;gap:8px;background:var(--surface);border-radius:14px;padding:12px}
 .pb{display:grid;grid-template-columns:64px 1fr 44px;align-items:center;gap:10px;font-size:14px}
-.pbar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden}.pbar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.pbar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden;display:flex}.pbar i{display:block;height:100%;background:var(--accent)}.pbar i.g{background:var(--prime)}
 .pb b{text-align:left;font-size:13px}
 .heat{display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:5px;background:var(--surface);border-radius:14px;padding:12px}
 .hc{aspect-ratio:1;border-radius:6px;background:color-mix(in srgb,var(--accent) calc(var(--a)*100%),var(--soft))}
 .hc[data-none="true"]{background:transparent;border:1px dashed var(--line)}
+.hc[data-gold="true"]{background:var(--prime)}
+.legend2{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}.legend2 i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:5px;vertical-align:middle}
 
 /* Tracker */
 .trk{display:flex;align-items:center;gap:14px}
-.ring{--p:0;width:58px;height:58px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(var(--ok) calc(var(--p)*1%),var(--soft) 0)}
+.ring{--p:0;--g:0;width:58px;height:58px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(var(--prime) calc(var(--g)*1%),var(--ok) 0 calc(var(--p)*1%),var(--soft) 0)}
 .ring span{width:46px;height:46px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-weight:700;font-size:15px}
 .week{display:flex;gap:6px;margin-top:8px}
 .week div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
 .week i{display:block;width:100%;max-width:28px;height:28px;border-radius:8px;background:var(--soft);position:relative;overflow:hidden}
-.week i b{position:absolute;inset:auto 0 0 0;background:var(--ok)}
+.week i b{position:absolute;inset:auto 0 0 0;background:var(--ok)}.week i b.g{background:var(--prime)}
 .week .tdy{color:var(--ink);font-weight:700}
 .qada{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding-bottom:14px}
 .qada div{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--soft);border-radius:12px;padding:8px 4px}
@@ -486,6 +492,7 @@ let S = Object.assign({}, DEFAULTS, store.get("settings", {}));
 S.adj = Object.assign({}, DEFAULTS.adj, S.adj||{});
 S.push = Object.assign({}, DEFAULTS.push, S.push||{});
 S.track = Object.assign({}, DEFAULTS.track, S.track||{});
+if(S.track.win==="next") S.track.win=60;   // old option: the blue level now always runs until the next prayer
 S.notify = Object.assign({}, DEFAULTS.notify, S.notify||{});
 S.notify.per = Object.assign({}, DEFAULTS.notify.per, S.notify.per||{});
 if(S.notify.sound===false && !store.get("toneSet",false)) S.notify.tone="none";
@@ -634,27 +641,34 @@ const checkSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const shareSvg=`<svg class="ios-share" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>`;
 
 /* ================= Prayer tracker =================
-   A prayer counts "on time" only when it is checked inside its window: from the adhan until
-   a fixed time after it, or until the next prayer (Fajr: until sunrise). Set in Settings.
-   After the window it can only be recorded as late (if allowed), which never counts as on time. */
-function trk(){ const t=store.get("track",{});
-  for(const k in t) if(Array.isArray(t[k])){ const o={}; t[k].forEach(p=>o[p]="on"); t[k]=o; }   // older format
+   Two levels, set when the prayer is checked:
+   - "gold": within S.track.win minutes after the adhan (default 60) — the best.
+   - "on"  : later, but before the next prayer comes in (Fajr: before sunrise, Isha: before midnight).
+   After the next prayer it can only be recorded as "late" (if allowed). Gold and blue both count
+   as on time; gold is shown apart in the statistics. */
+function trk(){ const t=store.get("track",{}); let ch=false;
+  for(const k in t) if(Array.isArray(t[k])){ const o={}; t[k].forEach(p=>o[p]="on"); t[k]=o; ch=true; }   // older format
+  if(!store.get("trk2")){ for(const k in t) for(const p in t[k]) if(t[k][p]==="on"){ t[k][p]="gold"; ch=true; }
+    store.set("trk2",true); }   // before v18 "on" meant "within the hour" — that is gold now
+  if(ch) store.set("track",t);
   return t; }
 function dayRec(g,t){ return (t||trk())[dayKey(g)]||{}; }
 const NEXT_OF={fajr:"sunrise",dhuhr:"asr",asr:"maghrib",maghrib:"isha"};
-function windowEnd(k,Td){ Td=Td||T;
-  if(S.track.win==="next") return k==="isha" ? Math.min(Td.midnight,24-1/60) : Td[NEXT_OF[k]];
-  return Td[k]+(+S.track.win||60)/60; }
-function prayerState(k){ if(nowH<T[k]) return "future"; return nowH<windowEnd(k) ? "open" : "closed"; }
+function windowEnd(k,Td){ Td=Td||T; return k==="isha" ? Math.min(Td.midnight,24-1/60) : Td[NEXT_OF[k]]; }
+function goldEnd(k,Td){ Td=Td||T; return Math.min(Td[k]+(+S.track.win||60)/60, windowEnd(k,Td)); }
+function prayerState(k){ if(nowH<T[k]) return "future"; if(nowH<goldEnd(k)) return "gold"; return nowH<windowEnd(k) ? "open" : "closed"; }
 function setMark(k){
   const t=trk(), key=dayKey(today), r=Object.assign({},t[key]||{}), st=prayerState(k);
   if(r[k]) delete r[k];
+  else if(st==="gold") r[k]="gold";
   else if(st==="open") r[k]="on";
   else if(st==="closed" && S.track.late) r[k]="late";
   else return st;
   t[key]=r; const keys=Object.keys(t).sort(); while(keys.length>400) delete t[keys.shift()];
   store.set("track",t); return "ok"; }
-const onTime=r=>FIVE.filter(k=>r[k]==="on").length;
+const isOn=v=>v==="gold"||v==="on";
+const onTime=r=>FIVE.filter(k=>isOn(r[k])).length;
+const golds=r=>FIVE.filter(k=>r[k]==="gold").length;
 function streak(){ const t=trk(); let n=0, d=[...today];
   if(onTime(dayRec(d,t))<5) d=addDays(...d,-1);
   while(onTime(dayRec(d,t))>=5 && n<999){ n++; d=addDays(...d,-1); }
@@ -666,15 +680,21 @@ function bestStreak(){ const t=trk(); let best=0, run=0, prev=null;
   return best; }
 function stats(days){
   const t=trk(), keys=Object.keys(t).filter(k=>Object.keys(t[k]).length).sort(), first=keys[0];
-  const per={}; FIVE.forEach(k=>per[k]={on:0,n:0}); let on=0,late=0,missed=0; const grid=[];
+  const per={}; FIVE.forEach(k=>per[k]={gold:0,on:0,n:0}); let gold=0,on=0,late=0,missed=0,goldDays=0; const grid=[];
   for(let i=days-1;i>=0;i--){
     const g=addDays(...today,-i), key=dayKey(g), r=t[key]||{};
     if(!first || key<first){ grid.push({g,c:-1}); continue; }
     for(const k of FIVE){
       if(i===0 && !r[k] && nowH<windowEnd(k)) continue;          // still possible today
-      per[k].n++; if(r[k]==="on"){ on++; per[k].on++; } else if(r[k]==="late") late++; else missed++; }
-    grid.push({g,c:onTime(r)}); }
-  const total=on+late+missed; return {on,late,missed,total,pct:total?Math.round(on/total*100):0,per,grid}; }
+      per[k].n++;
+      if(r[k]==="gold"){ gold++; per[k].gold++; } else if(r[k]==="on"){ on++; per[k].on++; }
+      else if(r[k]==="late") late++; else missed++; }
+    if(golds(r)===5) goldDays++;
+    grid.push({g,c:onTime(r),gold:golds(r)===5}); }
+  const total=gold+on+late+missed;
+  return {gold,on,late,missed,total,goldDays,
+    pct:total?Math.round((gold+on)/total*100):0, gpct:total?Math.round(gold/total*100):0,
+    score:total?Math.round((gold+on*0.5)/total*100):0, per,grid}; }
 function qada(){ return Object.assign({fajr:0,dhuhr:0,asr:0,maghrib:0,isha:0}, store.get("qada",{})); }
 
 /* ================= Views ================= */
@@ -684,20 +704,22 @@ function viewPrayer(){
   const list=PRAYERS.map(p=>{
     const isP=p.k!=="sunrise", on=isP&&alertsOn()&&S.notify.per[p.k], future=isP&&nowH<T[p.k];
     const mark=isP?rec[p.k]:null, st=isP?prayerState(p.k):"";
-    const hint = !isP ? "" : mark==="on" ? "" : mark==="late" ? "متأخرة" : st==="open" ? "سجّلها قبل "+fmt(windowEnd(p.k)) : st==="closed" ? "فات وقتها" : "";
-    const sub = p.k==="dhuhr"&&fri ? `<small>صلاة الجمعة${hint?" · "+hint:""}</small>` : p.k==="sunrise" ? "<small>نهاية وقت الفجر</small>" : hint?`<small class="${st==="open"&&!mark?"hint-open":""}">${hint}</small>`:"";
-    const cls = mark==="on"?"on":mark==="late"?"late":st==="open"?"open":st==="closed"?"miss":"";
+    const hint = !isP ? "" : mark==="gold" ? "ممتازة · في أول وقتها" : mark==="on" ? "في وقتها" : mark==="late" ? "متأخرة"
+      : st==="gold" ? "ممتازة إذا سجّلتها قبل "+fmt(goldEnd(p.k)) : st==="open" ? "في وقتها قبل "+fmt(windowEnd(p.k)) : st==="closed" ? "فات وقتها" : "";
+    const hcls = mark==="gold"||(!mark&&st==="gold") ? "hint-prime" : (!mark&&st==="open") ? "hint-open" : "";
+    const sub = p.k==="dhuhr"&&fri ? `<small class="${hcls}">صلاة الجمعة${hint?" · "+hint:""}</small>` : p.k==="sunrise" ? "<small>نهاية وقت الفجر</small>" : hint?`<small class="${hcls}">${hint}</small>`:"";
+    const cls = mark==="gold"?"gold":mark==="on"?"on":mark==="late"?"late":st==="gold"?"open prime":st==="open"?"open":st==="closed"?"miss":"";
     const dis = !mark && (st==="future" || (st==="closed" && !S.track.late));
     return `<div class="p ${isP&&p.k===per?"cur":""} ${isP?"":"dim"}">
-      ${isP?`<button class="chk ${cls}" data-done="${p.k}" aria-pressed="${!!mark}" ${dis?"disabled":""} aria-label="صلّيت ${p.n}">${mark==="late"?clockSvg:checkSvg}</button>`:`<span class="chk-sp"></span>`}
+      ${isP?`<button class="chk ${cls}" data-done="${p.k}" aria-pressed="${!!mark}" ${dis?"disabled":""} aria-label="صلّيت ${p.n}${mark==="gold"?" — ممتازة":""}">${mark==="late"?clockSvg:checkSvg}</button>`:`<span class="chk-sp"></span>`}
       <span class="nm">${p.n}${sub}</span><span class="tm num">${fmt(T[p.k])}</span>
       ${isP?`<button class="bell" data-bell="${p.k}" aria-pressed="${on}" aria-label="تنبيه ${p.n}">${bellSvg(on)}</button>`:`<span class="spacer"></span>`}
     </div>`; }).join("");
 
   // Tracker summary
-  const n=onTime(rec), nl=FIVE.filter(k=>rec[k]==="late").length, st=streak(), t=trk();
-  const week=[]; for(let i=6;i>=0;i--){ const g=addDays(...today,-i), c=onTime(dayRec(g,t));
-    week.push(`<div class="${i===0?"tdy":""}"><i title="${c}/5"><b style="height:${c/5*100}%"></b></i>${"حنثرخجس"[dow(g)]}</div>`); }
+  const n=onTime(rec), ng=golds(rec), nl=FIVE.filter(k=>rec[k]==="late").length, st=streak(), t=trk();
+  const week=[]; for(let i=6;i>=0;i--){ const g=addDays(...today,-i), d=dayRec(g,t), c=onTime(d), cg=golds(d);
+    week.push(`<div class="${i===0?"tdy":""}"><i title="${c}/5"><b style="height:${c/5*100}%"></b><b class="g" style="height:${cg/5*100}%"></b></i>${"حنثرخجس"[dow(g)]}</div>`); }
   const q=qada(), qTotal=FIVE.reduce((s,k)=>s+q[k],0);
   const qrows=FIVE.map(k=>`<div><span class="small">${PNAME[k]}</span><b class="num">${q[k]}</b><span class="qb"><button data-qada="${k}" data-d="-1" aria-label="ناقص">−</button><button data-qada="${k}" data-d="1" aria-label="زائد">+</button></span></div>`).join("");
 
@@ -725,9 +747,9 @@ function viewPrayer(){
   ${friday}
   <section class="card pad">
     <div class="trk">
-      <div class="ring" style="--p:${n/5*100}"><span class="num">${n}/5</span></div>
-      <div class="grow"><b>${n===5?"كل صلوات اليوم في وقتها":"في وقتها اليوم"}</b>
-        <div class="small muted">${nl?`<span class="num">${nl}</span> متأخرة · `:""}${st>0?`سلسلة ${daysWord(st)} في وقتها`:"اضغط ✓ بعد كل صلاة، داخل وقتها"}</div></div>
+      <div class="ring" style="--p:${n/5*100};--g:${ng/5*100}"><span class="num">${n}/5</span></div>
+      <div class="grow"><b>${ng===5?"يوم ممتاز: كل الصلوات في أول وقتها":n===5?"كل صلوات اليوم في وقتها":"في وقتها اليوم"}</b>
+        <div class="small muted">${ng?`<span class="num" style="color:var(--prime)">${ng}</span> ممتازة · `:""}${nl?`<span class="num">${nl}</span> متأخرة · `:""}${st>0?`سلسلة ${daysWord(st)} في وقتها`:"اضغط ✓ بعد كل صلاة، داخل وقتها"}</div></div>
     </div>
     <div class="week" aria-label="آخر 7 أيام">${week.join("")}</div>
     <button class="btn soft block" data-stats style="margin-top:12px">${chartSvg} الإحصائيات</button>
@@ -992,9 +1014,10 @@ function viewSettings(){
   </section>
   <div class="h">تتبّع الصلوات</div>
   <section class="card">
-    <div class="field"><label for="trk_win">تُحسب الصلاة في وقتها إذا سُجّلت</label><select id="trk_win">
-      ${[["30","خلال 30 دقيقة بعد الأذان"],["60","خلال ساعة بعد الأذان"],["90","خلال ساعة ونصف بعد الأذان"],["120","خلال ساعتين بعد الأذان"],["next","قبل دخول الصلاة التالية (الفجر قبل الشروق)"]]
-        .map(([v,l])=>`<option value="${v}"${String(S.track.win)===v?" selected":""}>${l}</option>`).join("")}</select></div>
+    <div class="field"><label for="trk_win">الصلاة الممتازة (ذهبي) إذا سُجّلت</label><select id="trk_win">
+      ${[["30","خلال 30 دقيقة بعد الأذان"],["45","خلال 45 دقيقة بعد الأذان"],["60","خلال ساعة بعد الأذان"],["90","خلال ساعة ونصف بعد الأذان"],["120","خلال ساعتين بعد الأذان"]]
+        .map(([v,l])=>`<option value="${v}"${String(S.track.win)===v?" selected":""}>${l}</option>`).join("")}</select>
+      <span class="note">بعدها وحتى دخول الصلاة التالية تُحسب في وقتها (أزرق). الفجر حتى الشروق، والعشاء حتى منتصف الليل.</span></div>
     ${sw("trk_late",S.track.late,"تسجيل الصلاة المتأخرة","بعد انتهاء الوقت تُسجَّل كمتأخرة، ولا تُحسب في وقتها")}
   </section>
   <div class="h">العرض</div>
@@ -1007,7 +1030,7 @@ function viewSettings(){
   <p class="note" style="text-align:center;margin:0">الإصدار ${APP_VERSION}</p>`;
 }
 
-const APP_VERSION="17";
+const APP_VERSION="18";
 function render(){
   renderHero();
   const v=document.getElementById("view");
@@ -1024,19 +1047,22 @@ function openStats(days){
   days=days||7;
   const r=stats(days), bg=document.createElement("div"); bg.className="sheet-bg stats"; bg.setAttribute("dir","rtl");
   const empty=!r.total;
-  const bars=FIVE.map(k=>{ const p=r.per[k], v=p.n?Math.round(p.on/p.n*100):0;
-    return `<div class="pb"><span>${PNAME[k]}</span><span class="pbar"><i style="width:${v}%"></i></span><b class="num">${p.n?v+"%":"—"}</b></div>`; }).join("");
-  const cells=r.grid.map(d=>`<i class="hc" style="--a:${d.c<0?0:(d.c/5)}" data-none="${d.c<0}" title="${d.g[2]}/${d.g[1]}: ${d.c<0?"—":d.c+"/5"}"></i>`).join("");
-  const winTxt = S.track.win==="next" ? "حتى دخول الصلاة التالية (الفجر حتى الشروق)" : (+S.track.win>=60? (+S.track.win/60).toString().replace(".5","ونصف")+" ساعة" : S.track.win+" دقيقة")+" بعد الأذان";
+  const bars=FIVE.map(k=>{ const p=r.per[k], g=p.n?p.gold/p.n*100:0, b=p.n?p.on/p.n*100:0;
+    return `<div class="pb"><span>${PNAME[k]}</span><span class="pbar"><i class="g" style="width:${g}%"></i><i style="width:${b}%"></i></span><b class="num">${p.n?Math.round(g+b)+"%":"—"}</b></div>`; }).join("");
+  const cells=r.grid.map(d=>`<i class="hc" style="--a:${d.c<0?0:(d.c/5)}" data-none="${d.c<0}" data-gold="${!!d.gold}" title="${d.g[2]}/${d.g[1]}: ${d.c<0?"—":d.c+"/5"}"></i>`).join("");
+  const w=+S.track.win||60, winTxt = w===60?"ساعة":w===90?"ساعة ونصف":w===120?"ساعتين":w+" دقيقة";
   bg.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="الإحصائيات">
     <div class="grab"></div>
     <div class="sheet-head"><h2>الإحصائيات</h2><button class="x" data-close aria-label="إغلاق"><svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="seg" style="--n:3">${[[7,"7 أيام"],[30,"30 يوماً"],[365,"سنة"]].map(([v,l])=>`<button data-days="${v}" aria-selected="${days===v}">${l}</button>`).join("")}</div>
     <div class="stats-body">
-    ${empty?`<p class="muted" style="text-align:center;margin:24px 0">لا توجد بيانات بعد. اضغط ✓ بجانب كل صلاة بعد أدائها في وقتها.</p>`:`
-      <div class="sbig"><div class="ring big" style="--p:${r.pct}"><span class="num">${r.pct}%</span></div>
-        <div><b>صلوات في وقتها</b><div class="small muted"><span class="num">${r.on}</span> من <span class="num">${r.total}</span></div></div></div>
-      <div class="scards">
+    ${empty?`<p class="muted" style="text-align:center;margin:24px 0">لا توجد بيانات بعد. اضغط ✓ بجانب كل صلاة بعد أدائها.</p>`:`
+      <div class="sbig"><div class="ring big" style="--p:${r.pct};--g:${r.gpct}"><span class="num">${r.pct}%</span></div>
+        <div><b>صلوات في وقتها</b><div class="small muted"><span class="num">${r.gold+r.on}</span> من <span class="num">${r.total}</span></div>
+          <div class="small" style="color:var(--prime);margin-top:2px">منها <span class="num">${r.gpct}%</span> ممتازة</div>
+          <div class="small muted">النقاط: <span class="num">${r.score}</span>/100</div></div></div>
+      <div class="scards c4">
+        <div class="gold"><b class="num">${r.gold}</b><span>ممتازة</span></div>
         <div><b class="num">${r.on}</b><span>في وقتها</span></div>
         <div class="late"><b class="num">${r.late}</b><span>متأخرة</span></div>
         <div class="miss"><b class="num">${r.missed}</b><span>غير مسجّلة</span></div>
@@ -1044,11 +1070,12 @@ function openStats(days){
       <div class="scards">
         <div><b class="num">${streak()}</b><span>السلسلة الحالية</span></div>
         <div><b class="num">${bestStreak()}</b><span>أفضل سلسلة</span></div>
+        <div class="gold"><b class="num">${r.goldDays}</b><span>أيام ممتازة</span></div>
       </div>
       <div class="lbl" style="margin-top:4px">حسب الصلاة</div>
-      <div class="pbars">${bars}</div>
+      <div class="pbars">${bars}<div class="legend2"><span><i style="background:var(--prime)"></i>ممتازة</span><span><i style="background:var(--accent)"></i>في وقتها</span></div></div>
       ${days<=30?`<div class="lbl">كل يوم</div><div class="heat" style="--cols:${days===7?7:10}">${cells}</div>`:""}`}
-      <p class="note" style="margin:6px 0 0">تُحسب الصلاة في وقتها إذا سُجّلت ${winTxt}. يمكنك تغيير ذلك من الإعدادات.</p>
+      <p class="note" style="margin:6px 0 0">ممتازة (ذهبي): سُجّلت خلال ${winTxt} بعد الأذان. في وقتها (أزرق): قبل دخول الصلاة التالية. النقاط: الممتازة نقطة كاملة، وفي وقتها نصف نقطة. يمكنك تغيير المدة من الإعدادات.</p>
     </div></div>`;
   document.getElementById("app").appendChild(bg);
   bg.addEventListener("click",e=>{
@@ -1371,7 +1398,7 @@ async function enablePush(){
       pushBusy=false; render(); return;
     }
     const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
-    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v17]", true);
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v18]", true);
   }
   pushBusy=false; render();
 }
@@ -1510,7 +1537,7 @@ document.getElementById("view").addEventListener("change",e=>{
     if(el.checked){ S.notify.on=true; S.notify.tone="adhan"; ensureAudio(); startWait(); } else stopWait();
     save(); render(); return; }
   else if(el.id==="tzfix") S.tzFix=+el.value;
-  else if(el.id==="trk_win") S.track.win = el.value==="next" ? "next" : +el.value;
+  else if(el.id==="trk_win") S.track.win = +el.value;
   else if(el.id==="trk_late") S.track.late=el.checked;
   else if(el.id==="n_ath") S.notify.athkar=el.checked;
   else if(el.id==="n_fri") S.notify.friday=el.checked;
