@@ -1109,10 +1109,16 @@ async function clearAdhanFile(){ try{ await idbDo("readwrite",st=>st.delete("adh
   stopAdhan(); if(adhan.mine) try{ URL.revokeObjectURL(adhan.mine.url); }catch(e){}
   adhan.mine=null; if(S.notify.adhanId==="mine"){ S.notify.adhanId=ADHANS[0].id; save(); } applyAdhan(); render(); }
 // Phones only let a page play audio it has already started from a tap: prime the player on the first tap.
-function unlockAudio(){ ensureAudio(); if(!adhan.src||adhan.unlocked||adhan.playing) return; const a=adhanEl();
-  a.muted=true; const p=a.play(); if(p&&p.then) p.then(()=>{ a.pause(); a.currentTime=0; a.muted=false; adhan.unlocked=true; }).catch(()=>{ a.muted=false; }); }
+function unlockAudio(){
+  ensureAudio();
+  if(!S.notify.on || S.notify.tone!=="adhan" || !adhan.src || adhan.unlocked || adhan.playing) return;
+  const a=adhanEl(); a.muted=true; a.volume=0;
+  const stop=()=>{ if(a.muted){ a.pause(); try{ a.currentTime=0; }catch(e){} } a.muted=false; a.volume=1; };
+  const p=a.play(); if(p&&p.then) p.then(()=>{ adhan.unlocked=true; stop(); }).catch(stop);
+  setTimeout(()=>{ if(a.muted) stop(); },400);
+}
 document.addEventListener("pointerdown",unlockAudio,true);
-function playAdhan(){ if(!adhan.src){ chime(); return; } const a=adhanEl(); a.muted=false; a.currentTime=0;
+function playAdhan(){ if(!adhan.src){ chime(); return; } const a=adhanEl(); a.muted=false; a.volume=1; a.currentTime=0;
   const p=a.play(); if(p&&p.catch) p.catch(()=>{ adhan.playing=false; chime(); }); }
 function stopAdhan(){ if(adhan.el){ adhan.el.pause(); try{ adhan.el.currentTime=0; }catch(e){} } adhan.playing=false; syncAdhanUI(); }
 function toast(title,body,stoppable){ document.querySelectorAll(".toast").forEach(x=>x.remove());
@@ -1209,7 +1215,7 @@ async function enablePush(){
       pushBusy=false; render(); return;
     }
     const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
-    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v10]", true);
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v11]", true);
   }
   pushBusy=false; render();
 }
@@ -1223,7 +1229,6 @@ function testLink(delay){ const e=btoa(pushSub.endpoint).replace(/\+/g,"-").repl
   return CFG.pushApi+"/api/testlink?e="+e+"&delay="+delay; }
 async function testPush(delay){
   if(!pushSub) return;
-  if(!delay){ ensureAudio(); unlockAudio(); const n=nextPrayer(); fire("حان وقت صلاة "+PNAME[n.k], loc.name+" · تجربة الأذان", true); }
   setPushMsg(delay?"جارٍ جدولة التجربة…":"جارٍ إرسال الإشعار…"); render();
   try{ const r=await api("test",{endpoint:pushSub.endpoint,delay});
     if(delay) setPushMsg("سيصلك إشعار الأذان خلال دقيقة أو دقيقتين. أغلق التطبيق وقفل الهاتف الآن.");
@@ -1270,9 +1275,9 @@ function pushBlock(){
   else if(st==="off" && pushLink) body=`<a class="btn block" href="${esc(pushLink)}" target="_blank" rel="noopener" data-push-link>إكمال التفعيل عبر Safari</a>`;
   else if(st==="off") body=`<button class="btn block" data-push-on ${pushBusy?"disabled":""}>${bellSvg(true).replace('<svg','<svg width="18" height="18"')} تفعيل إشعارات الهاتف</button>`;
   else body= (pushTestLinks
-      ? `<a class="btn block" href="${esc(testLink(0))}" target="_blank" rel="noopener">تجربة إشعار الأذان الآن (Safari)</a>
+      ? `<a class="btn block" href="${esc(testLink(0))}" target="_blank" rel="noopener">تجربة إشعار الهاتف الآن (Safari)</a>
          <a class="btn soft block" href="${esc(testLink(60))}" target="_blank" rel="noopener">تجربة بعد دقيقة — ثم أقفل الهاتف</a>`
-      : `<button class="btn block" data-push-test="0" ${pushBusy?"disabled":""}>${bellSvg(true).replace('<svg','<svg width="18" height="18"')} تجربة إشعار الأذان الآن</button>
+      : `<button class="btn block" data-push-test="0" ${pushBusy?"disabled":""}>${bellSvg(true).replace('<svg','<svg width="18" height="18"')} تجربة إشعار الهاتف الآن</button>
          <button class="btn soft block" data-push-test="60" ${pushBusy?"disabled":""}>تجربة بعد دقيقة — ثم أقفل الهاتف</button>`)
     + `<button class="link small" data-push-off style="align-self:flex-start" ${pushBusy?"disabled":""}>إيقاف إشعارات الهاتف</button>`;
   return `<div class="push">
@@ -1356,7 +1361,9 @@ function updateNow(){ const p=localNow(loc.tz); nowH=p.H+p.M/60+p.s/3600;
 function full(){ refreshDay(); updateNow(); render(); tick(); }
 setInterval(()=>{ if(updateNow()){ if(tab==="prayer"){ const y=SC().scrollTop; render(); SC().scrollTop=y; } else renderHero(); checkNotify(); } tick(); }, 1000);
 // Coming back to the app (iPhone keeps it frozen in the background): refresh right away.
-document.addEventListener("visibilitychange",()=>{ if(document.hidden) return; full(); quietGPS(); });
+function silenceAll(){ stopAdhan(); document.querySelectorAll(".live-adhan").forEach(x=>x.remove()); }
+document.addEventListener("visibilitychange",()=>{ if(document.hidden){ silenceAll(); return; } silenceAll(); full(); quietGPS(); });
+window.addEventListener("pagehide",silenceAll);
 
 /* Location never prompts on its own: the saved position is reused, and it is refreshed
    silently only when the phone has already granted access (iPhone home-screen apps ask again each launch). */
