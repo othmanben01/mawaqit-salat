@@ -54,6 +54,14 @@ export class Hub extends DurableObject {
       if (path === "/api/key") return json({ publicKey: (await this.vapid()).publicKey });
       // Fallback opened in Safari when the home-screen app cannot reach the server itself.
       if (path === "/api/link") return this.link(new URL(req.url).searchParams.get("d") || "");
+      if (path === "/api/testlink") {
+        const q = new URL(req.url).searchParams;
+        let endpoint = ""; try { endpoint = new TextDecoder().decode(unb64u(q.get("e") || "")); } catch {}
+        const r = await this.test(endpoint, Number(q.get("delay")) || 0);
+        const msg = r.ok ? (r.scheduled ? "سيصلك إشعار الأذان خلال دقيقة أو دقيقتين ✓<br><small>أغلق التطبيق وقفل الهاتف لتراه كما سيظهر.</small>" : "أُرسل إشعار الأذان ✓")
+          : "تعذّر إرسال التجربة<br><small>فعّل الإشعارات من التطبيق أولاً.</small>";
+        return page(msg, r.ok ? 200 : 400);
+      }
       if (req.method !== "POST") return json({ error: "method" }, 405);
       if (path === "/api/tick") {
         if (req.headers.get("x-cron") !== "1") return json({ error: "forbidden" }, 403);
@@ -67,10 +75,8 @@ export class Hub extends DurableObject {
         return json({ ok: true });
       }
       if (path === "/api/test") {
-        const rec = body.endpoint && await this.ctx.storage.get(SUB_PREFIX + await idOf(body.endpoint));
-        if (!rec) return json({ error: "not_found" }, 404);
-        const status = await this.send(rec, { title: "تجربة الإشعارات", body: "ستصلك تنبيهات الصلاة هنا بإذن الله · " + (rec.prefs.name || ""), tag: "test" });
-        return json({ ok: status >= 200 && status < 300, status });
+        const r = await this.test(body.endpoint, Number(body.delay) || 0);
+        return json(r, r.ok ? 200 : (r.error === "not_found" ? 404 : 502));
       }
       return json({ error: "not_found" }, 404);
     } catch (e) {
@@ -115,10 +121,21 @@ export class Hub extends DurableObject {
     }
     const msg = ok ? (sent ? "تم تفعيل الإشعارات ✓<br><small>وصلك إشعار تجريبي. يمكنك الرجوع إلى التطبيق.</small>" : "تم حفظ الاشتراك ✓<br><small>ارجع إلى التطبيق.</small>")
       : "تعذّر التفعيل<br><small>ارجع إلى التطبيق وحاول مرة أخرى.</small>";
-    const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>مواقيت</title>
-<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0A1311;color:#E7EFEC;font:600 24px/1.6 system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box}small{font-size:16px;font-weight:400;color:#8FA09B}</style></head>
-<body><div>${msg}</div></body></html>`;
-    return new Response(html, { status: ok ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
+    return page(msg, ok ? 200 : 400);
+  }
+
+  /* A notification that looks exactly like a real prayer alert, now or after a delay (sent by the cron). */
+  async test(endpoint, delay) {
+    if (!endpoint) return { ok: false, error: "not_found" };
+    const key = SUB_PREFIX + await idOf(endpoint), rec = await this.ctx.storage.get(key);
+    if (!rec) return { ok: false, error: "not_found" };
+    if (delay > 0) {
+      rec.test = { at: Date.now() + Math.min(delay, 600) * 1000 };
+      await this.ctx.storage.put(key, rec);
+      return { ok: true, scheduled: true };
+    }
+    const status = await this.send(rec, liveMessage(rec.prefs, Date.now())).catch(() => 0);
+    return { ok: status >= 200 && status < 300, status };
   }
 
   async tick(now) {
@@ -126,6 +143,11 @@ export class Hub extends DurableObject {
     let sent = 0, removed = 0;
     const jobs = [];
     for (const [key, rec] of list) {
+      if (rec.test && rec.test.at <= now) {
+        delete rec.test;
+        jobs.push(this.send(rec, liveMessage(rec.prefs, now)).catch(() => 0).then(() => this.ctx.storage.put(key, rec)));
+        continue;
+      }
       let r;
       try { r = dueEvents(rec.prefs, now); } catch { continue; }
       const done = rec.sent && rec.sent.day === r.day ? rec.sent.tags : [];
@@ -298,6 +320,21 @@ export function computeDay(y, m, d, P) {
 }
 function hm(h) { h = fix(h + 0.5 / 60, 24); const H = Math.floor(h), Mi = Math.floor((h - H) * 60); return String(H).padStart(2, "0") + ":" + String(Mi).padStart(2, "0"); }
 const mins = n => n + (n <= 10 ? " دقائق" : " دقيقة");
+
+/* Test message: the next prayer, worded exactly like the real alert. */
+function liveMessage(P, nowMs) {
+  try {
+    const p = localNow(P.tz, P.tzFix, nowMs), nowH = p.H + p.M / 60, T = computeDay(p.y, p.m, p.d, P);
+    const k = FIVE.find(x => T[x] > nowH) || "fajr";
+    return { title: "حان وقت صلاة " + PN[k], body: (P.name ? P.name + " · " : "") + "تجربة الإشعار", tag: "live-test" };
+  } catch { return { title: "حان وقت الصلاة", body: "تجربة الإشعار", tag: "live-test" }; }
+}
+function page(msg, status) {
+  const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>مواقيت</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0B1422;color:#E6EDF7;font:600 24px/1.6 system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box}small{font-size:16px;font-weight:400;color:#8C9AB0}</style></head>
+<body><div>${msg}</div></body></html>`;
+  return new Response(html, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
+}
 
 /* Which notifications are due now for one phone. A 5-minute window absorbs a late cron run. */
 export function dueEvents(P, nowMs) {

@@ -1,5 +1,5 @@
 // Service worker: shows push notifications and keeps the app usable offline.
-const CACHE = "mawaqit-v8";
+const CACHE = "mawaqit-v9";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-180.png", "./icons/badge-96.png"];
 
 self.addEventListener("install", e => {
