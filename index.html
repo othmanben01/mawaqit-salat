@@ -328,10 +328,14 @@ select,input[type=text],input[type=number],input[type=search]{background:var(--s
 .la-ring{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.14);animation:la 2s ease-in-out infinite}
 @keyframes la{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.25)}50%{box-shadow:0 0 0 18px rgba(255,255,255,0)}}
 @media (prefers-reduced-motion: reduce){.la-ring{animation:none}}
-.bgst{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:14px;padding:11px 14px;font-size:13.5px;font-weight:600;box-sizing:border-box}
+.bgst{display:flex;align-items:center;justify-content:flex-start;gap:8px;width:100%;border:0;border-radius:14px;padding:11px 14px;font-size:13.5px;font-weight:600;box-sizing:border-box}
 .bgst.on{background:var(--accent-soft);color:var(--accent)}
 .bgst.on i{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:bgp 2s ease-in-out infinite}
 .bgst.off{background:var(--gold-soft);color:var(--gold)}
+.bgst.idle{background:var(--soft);color:var(--muted)}
+.bgst span{flex:1;min-width:0}.bgst span[data-bg-start]{cursor:pointer}
+.bgbtn{flex:none;border:0;border-radius:99px;padding:6px 14px;font:inherit;font-size:12.5px;font-weight:700;background:var(--surface);color:inherit;cursor:pointer}
+.bgst.idle .bgbtn{background:var(--accent);color:var(--on-accent)}
 @keyframes bgp{50%{opacity:.3}}
 .toast{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));z-index:40;
   max-width:520px;margin:0 auto;background:var(--ink);color:var(--bg);border-radius:16px;padding:14px 16px;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.25)}
@@ -556,7 +560,17 @@ function intlOffset(tz,ms){
 }
 function offsetAt(tz,ms){ const base=(MA_TZ.includes(tz) && ms>=MA_GMT_FROM) ? 0 : intlOffset(tz,ms); return base+(+S.tzFix||0); }
 function tzOffset(tz,y,m,d){ return offsetAt(tz, Date.UTC(y,m-1,d,12)); }
-function localNow(tz){ const ms=Date.now(), x=new Date(ms+offsetAt(tz,ms)*3600000);
+/* Real time from the web server's Date header. If the phone's clock is off by more than 90 s
+   (clock set by hand), the app uses the real time instead. */
+let clockSkew=+store.get("skew",0)||0, skewAt=0;
+function nowMs(){ return Date.now()+clockSkew; }
+async function checkClock(){
+  if(Date.now()-skewAt<10*60000) return; skewAt=Date.now();
+  try{ const t0=Date.now(), r=await fetch("config.json?t="+t0,{cache:"no-store"}), t1=Date.now();
+    const d=Date.parse(r.headers.get("Date")||""); if(!d) return;
+    const raw=d+500-(t0+t1)/2, v=Math.abs(raw)>90000 ? Math.round(raw/60000)*60000 : 0;
+    if(v!==clockSkew){ clockSkew=v; store.set("skew",v); if(typeof full==="function") full(); } }catch(e){} }
+function localNow(tz){ const ms=nowMs(), x=new Date(ms+offsetAt(tz,ms)*3600000);
   return {y:x.getUTCFullYear(),m:x.getUTCMonth()+1,d:x.getUTCDate(),H:x.getUTCHours(),M:x.getUTCMinutes(),s:x.getUTCSeconds()}; }
 // Countries spanning several time zones keep the device zone; others use the country's zone.
 const MULTI_TZ = ["US","CA","ID","AU","RU","BR","MX","KZ"];
@@ -1030,7 +1044,7 @@ function viewSettings(){
   <p class="note" style="text-align:center;margin:0">الإصدار ${APP_VERSION}</p>`;
 }
 
-const APP_VERSION="18";
+const APP_VERSION="19";
 function render(){
   renderHero();
   const v=document.getElementById("view");
@@ -1231,9 +1245,10 @@ function startWait(){
 }
 function stopWait(){ if(adhan.el && adhan.kind==="silence"){ adhan.switching=true; adhan.el.pause(); adhan.switching=false; } adhan.bg=false; bgUI(); }
 function bgStatusHtml(){
-  if(!S.bgAdhan) return "";
-  return adhan.bg ? `<div id="bgStatus" class="bgst on"><i></i>الأذان في الخلفية يعمل · لا تغلق التطبيق بالسحب</div>`
-    : `<button id="bgStatus" class="bgst off" data-bg-start>المس الشاشة لتشغيل الأذان في الخلفية</button>`;
+  const off=`<button class="bgbtn" data-bg-toggle="0">إيقاف</button>`;
+  if(!S.bgAdhan) return alertsOn() ? `<div id="bgStatus" class="bgst idle"><span>الأذان في الخلفية متوقف · الإشعار فقط</span><button class="bgbtn" data-bg-toggle="1">تشغيل</button></div>` : "";
+  return adhan.bg ? `<div id="bgStatus" class="bgst on"><i></i><span>الأذان في الخلفية يعمل · لا تغلقه بالسحب</span>${off}</div>`
+    : `<div id="bgStatus" class="bgst off"><span data-bg-start>المس هنا لتشغيل الأذان في الخلفية</span>${off}</div>`;
 }
 function bgUI(){ const el=document.getElementById("bgStatus"); if(el) el.outerHTML=bgStatusHtml(); }
 function syncAdhanUI(){
@@ -1398,7 +1413,7 @@ async function enablePush(){
       pushBusy=false; render(); return;
     }
     const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
-    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v18]", true);
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v19]", true);
   }
   pushBusy=false; render();
 }
@@ -1434,7 +1449,7 @@ async function syncPush(force){
   try{ await api("subscribe",{subscription:pushSub.toJSON(),prefs:JSON.parse(p)}); store.set("pushSent",{p,at:Date.now()}); }catch(e){}
 }
 async function initPush(){
-  await loadConfig();
+  await loadConfig(); checkClock();
   if(!IN_FRAME && "serviceWorker" in navigator){
     try{ swReg=await navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}); swReg.update().catch(()=>{}); }catch(e){}
     if(swReg && PUSH_OK){ try{ pushSub=await swReg.pushManager.getSubscription(); }catch(e){} }
@@ -1496,6 +1511,11 @@ document.getElementById("view").addEventListener("click",e=>{
     const st=pushState(); if(st==="off"){ enablePush(); return; }
     go("settings"); setTimeout(()=>{ const h=document.getElementById("notifH"); if(h) h.scrollIntoView({behavior:"smooth"}); },50); return; }
   if(e.target.closest("[data-push-on]")){ enablePush(); return; }
+  const bgt=e.target.closest("[data-bg-toggle]");
+  if(bgt){ const on=bgt.dataset.bgToggle==="1"; S.bgAdhan=on;
+    if(on){ S.notify.on=true; S.notify.tone="adhan"; ensureAudio(); startWait(); }
+    else { stopWait(); try{ if("mediaSession" in navigator && !adhan.playing){ navigator.mediaSession.metadata=null; navigator.mediaSession.playbackState="none"; } }catch(err){} }
+    save(); const y=SC().scrollTop; render(); SC().scrollTop=y; return; }
   if(e.target.closest("[data-bg-start]")){ startWait(); return; }
   if(e.target.closest("[data-push-link]")){
     // The link opens Safari, which saves the subscription and sends a test notification.
@@ -1558,7 +1578,7 @@ function full(){ refreshDay(); updateNow(); render(); tick(); }
 setInterval(()=>{ if(updateNow()){ if(adhan.bg && adhan.kind==="silence") setMS("wait"); if(tab==="prayer"){ const y=SC().scrollTop; render(); SC().scrollTop=y; } else renderHero(); checkNotify(); } tick(); }, 1000);
 // Coming back to the app (iPhone keeps it frozen in the background): refresh right away.
 function silenceAll(){ if(!S.bgAdhan) stopAdhan(); document.querySelectorAll(".live-adhan").forEach(x=>x.remove()); }
-document.addEventListener("visibilitychange",()=>{ if(document.hidden){ silenceAll(); return; } silenceAll(); full(); quietGPS(); });
+document.addEventListener("visibilitychange",()=>{ if(document.hidden){ silenceAll(); return; } silenceAll(); full(); quietGPS(); checkClock(); });
 window.addEventListener("pagehide",silenceAll);
 
 /* Location never prompts on its own: the saved position is reused, and it is refreshed
