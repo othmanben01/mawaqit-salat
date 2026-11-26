@@ -94,6 +94,25 @@ input[type=number]{-moz-appearance:textfield}
 .chk[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
 .chk:disabled{opacity:.35;cursor:default}
 .chk-sp{width:30px;flex:none}
+.chk.open{border-color:var(--accent)}
+.chk.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.chk.late{background:var(--gold);border-color:var(--gold);color:#fff}
+.chk.miss{border-style:dashed;border-color:var(--line)}
+.p .nm small.hint-open{color:var(--accent);font-weight:600}
+.sbig{display:flex;align-items:center;gap:16px;padding:6px 0}
+.ring.big{width:86px;height:86px}.ring.big span{width:70px;height:70px;font-size:20px}
+.scards{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
+.scards div{background:var(--surface);border-radius:14px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.scards b{font-size:22px;color:var(--accent)}.scards .late b{color:var(--gold)}.scards .miss b{color:var(--muted)}
+.scards span{font-size:12px;color:var(--muted)}
+.stats-body{overflow-y:auto;display:flex;flex-direction:column;gap:12px;min-height:0}
+.pbars{display:flex;flex-direction:column;gap:8px;background:var(--surface);border-radius:14px;padding:12px}
+.pb{display:grid;grid-template-columns:64px 1fr 44px;align-items:center;gap:10px;font-size:14px}
+.pbar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden}.pbar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.pb b{text-align:left;font-size:13px}
+.heat{display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:5px;background:var(--surface);border-radius:14px;padding:12px}
+.hc{aspect-ratio:1;border-radius:6px;background:color-mix(in srgb,var(--accent) calc(var(--a)*100%),var(--soft))}
+.hc[data-none="true"]{background:transparent;border:1px dashed var(--line)}
 
 /* Tracker */
 .trk{display:flex;align-items:center;gap:14px}
@@ -461,11 +480,12 @@ const store = {
 };
 const FIRST_RUN = store.get("settings", null) === null;
 const DEFAULTS = {city:"casa", gps:null, custom:null, method:"auto", asr:1, adj:{fajr:0,sunrise:0,dhuhr:0,asr:0,maghrib:0,isha:0},
-  hijriAdj:0, h12:false, tzFix:0, push:{on:false}, bgAdhan:true,
+  hijriAdj:0, h12:false, tzFix:0, push:{on:false}, bgAdhan:true, track:{win:60, late:true},
   notify:{on:true, tone:"adhan", adhanId:"makkah", before:0, athkar:true, friday:true, per:{fajr:true,dhuhr:true,asr:true,maghrib:true,isha:true}}};
 let S = Object.assign({}, DEFAULTS, store.get("settings", {}));
 S.adj = Object.assign({}, DEFAULTS.adj, S.adj||{});
 S.push = Object.assign({}, DEFAULTS.push, S.push||{});
+S.track = Object.assign({}, DEFAULTS.track, S.track||{});
 S.notify = Object.assign({}, DEFAULTS.notify, S.notify||{});
 S.notify.per = Object.assign({}, DEFAULTS.notify.per, S.notify.per||{});
 if(S.notify.sound===false && !store.get("toneSet",false)) S.notify.tone="none";
@@ -608,41 +628,75 @@ function tick(){
 const bellSvg=on=>on
   ?`<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22a2.5 2.5 0 0 0 2.4-1.8H9.6A2.5 2.5 0 0 0 12 22zm7-5.5-1.6-1.8V10a5.4 5.4 0 0 0-4.2-5.3V4a1.2 1.2 0 1 0-2.4 0v.7A5.4 5.4 0 0 0 6.6 10v4.7L5 16.5V18h14z"/></svg>`
   :`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M18 16.5V10a6 6 0 0 0-12 0v6.5L4.5 18h15z"/><path d="M10 21h4"/><path d="M4 4l16 16" stroke-linecap="round"/></svg>`;
+const clockSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2"/></svg>`;
+const chartSvg=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>`;
 const checkSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
 const shareSvg=`<svg class="ios-share" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>`;
 
-/* ================= Prayer tracker ================= */
-function trk(){ return store.get("track",{}); }
-function doneOn(g){ return trk()[dayKey(g)]||[]; }
-function toggleDone(k){
-  const t=trk(), key=dayKey(today), a=new Set(t[key]||[]);
-  if(a.has(k)) a.delete(k); else a.add(k);
-  t[key]=[...a];
-  const keys=Object.keys(t).sort(); while(keys.length>120) delete t[keys.shift()];
-  store.set("track",t);
-}
+/* ================= Prayer tracker =================
+   A prayer counts "on time" only when it is checked inside its window: from the adhan until
+   a fixed time after it, or until the next prayer (Fajr: until sunrise). Set in Settings.
+   After the window it can only be recorded as late (if allowed), which never counts as on time. */
+function trk(){ const t=store.get("track",{});
+  for(const k in t) if(Array.isArray(t[k])){ const o={}; t[k].forEach(p=>o[p]="on"); t[k]=o; }   // older format
+  return t; }
+function dayRec(g,t){ return (t||trk())[dayKey(g)]||{}; }
+const NEXT_OF={fajr:"sunrise",dhuhr:"asr",asr:"maghrib",maghrib:"isha"};
+function windowEnd(k,Td){ Td=Td||T;
+  if(S.track.win==="next") return k==="isha" ? Math.min(Td.midnight,24-1/60) : Td[NEXT_OF[k]];
+  return Td[k]+(+S.track.win||60)/60; }
+function prayerState(k){ if(nowH<T[k]) return "future"; return nowH<windowEnd(k) ? "open" : "closed"; }
+function setMark(k){
+  const t=trk(), key=dayKey(today), r=Object.assign({},t[key]||{}), st=prayerState(k);
+  if(r[k]) delete r[k];
+  else if(st==="open") r[k]="on";
+  else if(st==="closed" && S.track.late) r[k]="late";
+  else return st;
+  t[key]=r; const keys=Object.keys(t).sort(); while(keys.length>400) delete t[keys.shift()];
+  store.set("track",t); return "ok"; }
+const onTime=r=>FIVE.filter(k=>r[k]==="on").length;
 function streak(){ const t=trk(); let n=0, d=[...today];
-  if((t[dayKey(d)]||[]).length<5) d=addDays(...d,-1);
-  while((t[dayKey(d)]||[]).length>=5 && n<999){ n++; d=addDays(...d,-1); }
+  if(onTime(dayRec(d,t))<5) d=addDays(...d,-1);
+  while(onTime(dayRec(d,t))>=5 && n<999){ n++; d=addDays(...d,-1); }
   return n; }
+function bestStreak(){ const t=trk(); let best=0, run=0, prev=null;
+  for(const key of Object.keys(t).sort()){ const full=onTime(t[key])>=5;
+    const g=key.split("-").map(Number), consecutive=prev && dayKey(addDays(...prev,1))===key;
+    run = full ? (consecutive?run+1:1) : 0; if(run>best) best=run; prev=g; }
+  return best; }
+function stats(days){
+  const t=trk(), keys=Object.keys(t).filter(k=>Object.keys(t[k]).length).sort(), first=keys[0];
+  const per={}; FIVE.forEach(k=>per[k]={on:0,n:0}); let on=0,late=0,missed=0; const grid=[];
+  for(let i=days-1;i>=0;i--){
+    const g=addDays(...today,-i), key=dayKey(g), r=t[key]||{};
+    if(!first || key<first){ grid.push({g,c:-1}); continue; }
+    for(const k of FIVE){
+      if(i===0 && !r[k] && nowH<windowEnd(k)) continue;          // still possible today
+      per[k].n++; if(r[k]==="on"){ on++; per[k].on++; } else if(r[k]==="late") late++; else missed++; }
+    grid.push({g,c:onTime(r)}); }
+  const total=on+late+missed; return {on,late,missed,total,pct:total?Math.round(on/total*100):0,per,grid}; }
 function qada(){ return Object.assign({fajr:0,dhuhr:0,asr:0,maghrib:0,isha:0}, store.get("qada",{})); }
 
 /* ================= Views ================= */
 function alertsOn(){ return S.notify.on || S.push.on; }
 function viewPrayer(){
-  const per=period(), fri=dow(today)===5, done=new Set(doneOn(today));
+  const per=period(), fri=dow(today)===5, rec=dayRec(today);
   const list=PRAYERS.map(p=>{
     const isP=p.k!=="sunrise", on=isP&&alertsOn()&&S.notify.per[p.k], future=isP&&nowH<T[p.k];
-    const sub = p.k==="dhuhr"&&fri ? "<small>صلاة الجمعة</small>" : p.k==="sunrise" ? "<small>نهاية وقت الفجر</small>" : "";
+    const mark=isP?rec[p.k]:null, st=isP?prayerState(p.k):"";
+    const hint = !isP ? "" : mark==="on" ? "" : mark==="late" ? "متأخرة" : st==="open" ? "سجّلها قبل "+fmt(windowEnd(p.k)) : st==="closed" ? "فات وقتها" : "";
+    const sub = p.k==="dhuhr"&&fri ? `<small>صلاة الجمعة${hint?" · "+hint:""}</small>` : p.k==="sunrise" ? "<small>نهاية وقت الفجر</small>" : hint?`<small class="${st==="open"&&!mark?"hint-open":""}">${hint}</small>`:"";
+    const cls = mark==="on"?"on":mark==="late"?"late":st==="open"?"open":st==="closed"?"miss":"";
+    const dis = !mark && (st==="future" || (st==="closed" && !S.track.late));
     return `<div class="p ${isP&&p.k===per?"cur":""} ${isP?"":"dim"}">
-      ${isP?`<button class="chk" data-done="${p.k}" aria-pressed="${done.has(p.k)}" ${future&&!done.has(p.k)?"disabled":""} aria-label="صلّيت ${p.n}">${checkSvg}</button>`:`<span class="chk-sp"></span>`}
+      ${isP?`<button class="chk ${cls}" data-done="${p.k}" aria-pressed="${!!mark}" ${dis?"disabled":""} aria-label="صلّيت ${p.n}">${mark==="late"?clockSvg:checkSvg}</button>`:`<span class="chk-sp"></span>`}
       <span class="nm">${p.n}${sub}</span><span class="tm num">${fmt(T[p.k])}</span>
       ${isP?`<button class="bell" data-bell="${p.k}" aria-pressed="${on}" aria-label="تنبيه ${p.n}">${bellSvg(on)}</button>`:`<span class="spacer"></span>`}
     </div>`; }).join("");
 
   // Tracker summary
-  const n=done.size, st=streak(), t=trk();
-  const week=[]; for(let i=6;i>=0;i--){ const g=addDays(...today,-i), c=(t[dayKey(g)]||[]).length;
+  const n=onTime(rec), nl=FIVE.filter(k=>rec[k]==="late").length, st=streak(), t=trk();
+  const week=[]; for(let i=6;i>=0;i--){ const g=addDays(...today,-i), c=onTime(dayRec(g,t));
     week.push(`<div class="${i===0?"tdy":""}"><i title="${c}/5"><b style="height:${c/5*100}%"></b></i>${"حنثرخجس"[dow(g)]}</div>`); }
   const q=qada(), qTotal=FIVE.reduce((s,k)=>s+q[k],0);
   const qrows=FIVE.map(k=>`<div><span class="small">${PNAME[k]}</span><b class="num">${q[k]}</b><span class="qb"><button data-qada="${k}" data-d="-1" aria-label="ناقص">−</button><button data-qada="${k}" data-d="1" aria-label="زائد">+</button></span></div>`).join("");
@@ -672,10 +726,11 @@ function viewPrayer(){
   <section class="card pad">
     <div class="trk">
       <div class="ring" style="--p:${n/5*100}"><span class="num">${n}/5</span></div>
-      <div class="grow"><b>${n===5?"أتممت صلوات اليوم":"صلوات اليوم"}</b>
-        <div class="small muted">${st>0?`سلسلة ${daysWord(st)} متتالية`:"اضغط ✓ بعد كل صلاة"}</div></div>
+      <div class="grow"><b>${n===5?"كل صلوات اليوم في وقتها":"في وقتها اليوم"}</b>
+        <div class="small muted">${nl?`<span class="num">${nl}</span> متأخرة · `:""}${st>0?`سلسلة ${daysWord(st)} في وقتها`:"اضغط ✓ بعد كل صلاة، داخل وقتها"}</div></div>
     </div>
     <div class="week" aria-label="آخر 7 أيام">${week.join("")}</div>
+    <button class="btn soft block" data-stats style="margin-top:12px">${chartSvg} الإحصائيات</button>
     <details class="more" id="qadaD"><summary>قضاء الفوائت ${qTotal?`<span class="pill warn num">${qTotal}</span>`:""}</summary><div class="qada">${qrows}</div></details>
   </section>
   <div class="h">عدد الركعات</div>
@@ -935,6 +990,13 @@ function viewSettings(){
       <span class="note">إشعار الهاتف يستعمل صوت النظام. صوت الأذان يعمل عندما يكون التطبيق مفتوحاً.</span>
     </div>
   </section>
+  <div class="h">تتبّع الصلوات</div>
+  <section class="card">
+    <div class="field"><label for="trk_win">تُحسب الصلاة في وقتها إذا سُجّلت</label><select id="trk_win">
+      ${[["30","خلال 30 دقيقة بعد الأذان"],["60","خلال ساعة بعد الأذان"],["90","خلال ساعة ونصف بعد الأذان"],["120","خلال ساعتين بعد الأذان"],["next","قبل دخول الصلاة التالية (الفجر قبل الشروق)"]]
+        .map(([v,l])=>`<option value="${v}"${String(S.track.win)===v?" selected":""}>${l}</option>`).join("")}</select></div>
+    ${sw("trk_late",S.track.late,"تسجيل الصلاة المتأخرة","بعد انتهاء الوقت تُسجَّل كمتأخرة، ولا تُحسب في وقتها")}
+  </section>
   <div class="h">العرض</div>
   <section class="card">
     ${sw("h12",S.h12,"نظام 12 ساعة")}
@@ -945,7 +1007,7 @@ function viewSettings(){
   <p class="note" style="text-align:center;margin:0">الإصدار ${APP_VERSION}</p>`;
 }
 
-const APP_VERSION="16";
+const APP_VERSION="17";
 function render(){
   renderHero();
   const v=document.getElementById("view");
@@ -954,6 +1016,45 @@ function render(){
   for(const id in open){ const el=document.getElementById(id); if(el&&open[id]) el.open=true; }
   document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===tab?"page":"false"));
   if(tab==="qibla" && compass.heading!==null) paintCompass();
+}
+
+/* ================= Statistics ================= */
+function openStats(days){
+  document.querySelectorAll(".sheet-bg.stats").forEach(x=>x.remove());
+  days=days||7;
+  const r=stats(days), bg=document.createElement("div"); bg.className="sheet-bg stats"; bg.setAttribute("dir","rtl");
+  const empty=!r.total;
+  const bars=FIVE.map(k=>{ const p=r.per[k], v=p.n?Math.round(p.on/p.n*100):0;
+    return `<div class="pb"><span>${PNAME[k]}</span><span class="pbar"><i style="width:${v}%"></i></span><b class="num">${p.n?v+"%":"—"}</b></div>`; }).join("");
+  const cells=r.grid.map(d=>`<i class="hc" style="--a:${d.c<0?0:(d.c/5)}" data-none="${d.c<0}" title="${d.g[2]}/${d.g[1]}: ${d.c<0?"—":d.c+"/5"}"></i>`).join("");
+  const winTxt = S.track.win==="next" ? "حتى دخول الصلاة التالية (الفجر حتى الشروق)" : (+S.track.win>=60? (+S.track.win/60).toString().replace(".5","ونصف")+" ساعة" : S.track.win+" دقيقة")+" بعد الأذان";
+  bg.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="الإحصائيات">
+    <div class="grab"></div>
+    <div class="sheet-head"><h2>الإحصائيات</h2><button class="x" data-close aria-label="إغلاق"><svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="seg" style="--n:3">${[[7,"7 أيام"],[30,"30 يوماً"],[365,"سنة"]].map(([v,l])=>`<button data-days="${v}" aria-selected="${days===v}">${l}</button>`).join("")}</div>
+    <div class="stats-body">
+    ${empty?`<p class="muted" style="text-align:center;margin:24px 0">لا توجد بيانات بعد. اضغط ✓ بجانب كل صلاة بعد أدائها في وقتها.</p>`:`
+      <div class="sbig"><div class="ring big" style="--p:${r.pct}"><span class="num">${r.pct}%</span></div>
+        <div><b>صلوات في وقتها</b><div class="small muted"><span class="num">${r.on}</span> من <span class="num">${r.total}</span></div></div></div>
+      <div class="scards">
+        <div><b class="num">${r.on}</b><span>في وقتها</span></div>
+        <div class="late"><b class="num">${r.late}</b><span>متأخرة</span></div>
+        <div class="miss"><b class="num">${r.missed}</b><span>غير مسجّلة</span></div>
+      </div>
+      <div class="scards">
+        <div><b class="num">${streak()}</b><span>السلسلة الحالية</span></div>
+        <div><b class="num">${bestStreak()}</b><span>أفضل سلسلة</span></div>
+      </div>
+      <div class="lbl" style="margin-top:4px">حسب الصلاة</div>
+      <div class="pbars">${bars}</div>
+      ${days<=30?`<div class="lbl">كل يوم</div><div class="heat" style="--cols:${days===7?7:10}">${cells}</div>`:""}`}
+      <p class="note" style="margin:6px 0 0">تُحسب الصلاة في وقتها إذا سُجّلت ${winTxt}. يمكنك تغيير ذلك من الإعدادات.</p>
+    </div></div>`;
+  document.getElementById("app").appendChild(bg);
+  bg.addEventListener("click",e=>{
+    if(e.target===bg||e.target.closest("[data-close]")){ bg.remove(); return; }
+    const d=e.target.closest("[data-days]"); if(d){ bg.remove(); openStats(+d.dataset.days); }
+  });
 }
 
 /* ================= Location ================= */
@@ -1270,7 +1371,7 @@ async function enablePush(){
       pushBusy=false; render(); return;
     }
     const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
-    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v16]", true);
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v17]", true);
   }
   pushBusy=false; render();
 }
@@ -1354,7 +1455,10 @@ document.getElementById("cityBtn").addEventListener("click",openSheet);
 document.getElementById("nav").addEventListener("click",e=>{ const b=e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab); });
 document.getElementById("view").addEventListener("click",e=>{
   if(e.target.closest("[data-city]")){ openSheet(); return; }
-  const dn=e.target.closest("[data-done]"); if(dn){ toggleDone(dn.dataset.done); try{ navigator.vibrate&&navigator.vibrate(15); }catch(err){} const y=SC().scrollTop; render(); SC().scrollTop=y; return; }
+  const dn=e.target.closest("[data-done]"); if(dn){ const res=setMark(dn.dataset.done);
+    if(res==="closed") toast("فات وقت هذه الصلاة","لا يمكن تسجيلها في وقتها الآن.",false);
+    try{ navigator.vibrate&&navigator.vibrate(15); }catch(err){} const y=SC().scrollTop; render(); SC().scrollTop=y; return; }
+  if(e.target.closest("[data-stats]")){ openStats(7); return; }
   const qd=e.target.closest("[data-qada]"); if(qd){ const q=qada(); q[qd.dataset.qada]=Math.max(0,q[qd.dataset.qada]+(+qd.dataset.d)); store.set("qada",q); const y=SC().scrollTop; render(); SC().scrollTop=y; return; }
   const bell=e.target.closest("[data-bell]");
   if(bell){ const k=bell.dataset.bell;
@@ -1406,6 +1510,8 @@ document.getElementById("view").addEventListener("change",e=>{
     if(el.checked){ S.notify.on=true; S.notify.tone="adhan"; ensureAudio(); startWait(); } else stopWait();
     save(); render(); return; }
   else if(el.id==="tzfix") S.tzFix=+el.value;
+  else if(el.id==="trk_win") S.track.win = el.value==="next" ? "next" : +el.value;
+  else if(el.id==="trk_late") S.track.late=el.checked;
   else if(el.id==="n_ath") S.notify.athkar=el.checked;
   else if(el.id==="n_fri") S.notify.friday=el.checked;
   else if(el.id==="n_before") S.notify.before=+el.value;
