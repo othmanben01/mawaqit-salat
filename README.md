@@ -23,13 +23,13 @@ Le dossier `worker/` contient un petit serveur gratuit (Cloudflare Workers) qui 
 1. Créer un compte gratuit sur https://dash.cloudflare.com
 2. Aller dans **Workers & Pages → Create → Import a repository**, connecter GitHub et choisir `mawaqit-salat`.
 3. Réglages du projet :
-   - **Project name** : `mawaqit-push` (exactement ce nom)
+   - **Project name** : `mawaqit-salat` (même nom que dans `worker/wrangler.toml`)
    - **Advanced settings → Path / Root directory** : `/worker`
    - Laisser la commande de déploiement par défaut (`npx wrangler deploy`), puis **Deploy**.
-4. Copier l'adresse du serveur affichée à la fin (du type `https://mawaqit-push.xxxx.workers.dev`).
+4. Copier l'adresse du serveur affichée à la fin (du type `https://mawaqit-salat.xxxx.workers.dev`).
 5. Dans ce dépôt GitHub, modifier `config.json` et coller l'adresse :
    ```json
-   { "pushApi": "https://mawaqit-push.xxxx.workers.dev" }
+   { "pushApi": "https://mawaqit-salat.xxxx.workers.dev" }
    ```
 6. Sur l'iPhone : ouvrir le lien de l'app dans Safari → Partager → **Ajouter à l'écran d'accueil**. Ouvrir l'app depuis l'icône → Réglages → **تفعيل إشعارات الهاتف**.
 
