@@ -1130,9 +1130,10 @@ function pushState(){
   if(Notification.permission==="denied") return "denied";
   return S.push.on && pushSub ? "on" : "off";
 }
+// text/plain keeps these "simple" requests (no CORS preflight); the server still reads JSON.
 async function api(path,body){
-  const r=await fetch(CFG.pushApi+"/api/"+path, body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{});
-  const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||("HTTP "+r.status)); return j; }
+  const r=await fetch(CFG.pushApi+"/api/"+path, body?{method:"POST",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify(body),cache:"no-store"}:{cache:"no-store"});
+  const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error((j.error||"HTTP")+" "+r.status+(j.message?" "+j.message:"")); return j; }
 function pushPrefs(){ const M=METHODS[methodKey(loc)];
   return {lat:loc.lat,lng:loc.lng,tz:loc.tz,name:loc.name, method:{fajr:M.fajr,isha:M.isha||0,ishaMin:M.ishaMin||0,adj:M.adj||{}},
     asr:S.asr, adj:S.adj, tzFix:S.tzFix, per:S.notify.per, before:+S.notify.before, athkar:!!S.notify.athkar, friday:!!S.notify.friday}; }
@@ -1144,22 +1145,28 @@ async function enablePush(){
   // iOS: the permission request must be the first thing after the tap.
   let perm; try{ perm=await Notification.requestPermission(); }catch(e){ perm=Notification.permission; }
   if(perm!=="granted"){ pushBusy=false; setPushMsg("لم يُسمح بالإشعارات. فعّلها من إعدادات الهاتف ← الإشعارات ← مواقيت.",true); render(); return; }
+  // Each step is named so a failure says exactly where it happened.
+  let step="sw";
   try{
     const reg=swReg||await navigator.serviceWorker.ready;
-    const {publicKey}=await api("key"), appKey=unb64u(publicKey);
+    step="key"; const {publicKey}=await api("key"), appKey=unb64u(publicKey);
+    step="apple";
     pushSub=await reg.pushManager.getSubscription();
-    if(!pushSub) pushSub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:appKey}).catch(async()=>{
-      const old=await reg.pushManager.getSubscription(); if(old) await old.unsubscribe();
-      return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:appKey}); });
+    if(!pushSub){
+      try{ pushSub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:appKey}); }
+      catch(e1){ const old=await reg.pushManager.getSubscription(); if(old) await old.unsubscribe();
+        pushSub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:appKey}); }
+    }
+    step="save";
     const prefs=pushPrefs();
     await api("subscribe",{subscription:pushSub.toJSON(),prefs});
     store.set("pushSent",{p:JSON.stringify(prefs),at:Date.now()});
     S.push.on=true; S.notify.on=true; store.set("settings",S);
     setPushMsg("تم التفعيل. ستصلك إشعارات الصلاة حتى والتطبيق مغلق.");
   }catch(e){
-    const net = e instanceof TypeError || /load failed|failed to fetch|network/i.test(String(e.message||e));
-    setPushMsg(net ? "تعذّر الوصول إلى خادم الإشعارات ("+CFG.pushApi.replace("https://","")+"). افتح هذا العنوان في Safari وأرسل لقطة الشاشة."
-      : "تعذّر التفعيل ("+(e.message||e)+"). حاول مجدداً.", true); }
+    const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v7]", true);
+  }
   pushBusy=false; render();
 }
 async function disablePush(){
