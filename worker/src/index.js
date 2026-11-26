@@ -58,7 +58,7 @@ export class Hub extends DurableObject {
         const q = new URL(req.url).searchParams;
         let endpoint = ""; try { endpoint = new TextDecoder().decode(unb64u(q.get("e") || "")); } catch {}
         const r = await this.test(endpoint, Number(q.get("delay")) || 0);
-        const msg = r.ok ? (r.scheduled ? "سيصلك إشعار الأذان خلال دقيقة أو دقيقتين ✓<br><small>أغلق التطبيق وقفل الهاتف لتراه كما سيظهر.</small>" : "أُرسل إشعار الأذان ✓")
+        const msg = r.ok ? (r.scheduled ? "سيصلك إشعار الأذان خلال دقيقة أو دقيقتين ✓<br><small>أقفل الهاتف لتراه كما سيظهر.</small>" : "أُرسل إشعار الأذان ✓")
           : "تعذّر إرسال التجربة<br><small>فعّل الإشعارات من التطبيق أولاً.</small>";
         return page(msg, r.ok ? 200 : 400);
       }
@@ -129,7 +129,9 @@ export class Hub extends DurableObject {
     if (!endpoint) return { ok: false, error: "not_found" };
     const key = SUB_PREFIX + await idOf(endpoint), rec = await this.ctx.storage.get(key);
     if (!rec) return { ok: false, error: "not_found" };
-    if (delay > 0) {
+    if (delay > 0 && delay <= 30) {
+      await new Promise(r => setTimeout(r, delay * 1000));
+    } else if (delay > 0) {
       rec.test = { at: Date.now() + Math.min(delay, 600) * 1000 };
       await this.ctx.storage.put(key, rec);
       return { ok: true, scheduled: true };

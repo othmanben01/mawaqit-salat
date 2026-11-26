@@ -943,7 +943,7 @@ function viewSettings(){
   <p class="note" style="text-align:center;margin:0">الإصدار ${APP_VERSION}</p>`;
 }
 
-const APP_VERSION="13";
+const APP_VERSION="14";
 function render(){
   renderHero();
   const v=document.getElementById("view");
@@ -1263,7 +1263,7 @@ async function enablePush(){
       pushBusy=false; render(); return;
     }
     const where={sw:"تشغيل التطبيق",key:"الاتصال بالخادم",apple:"التسجيل لدى Apple",save:"حفظ الاشتراك في الخادم"}[step];
-    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v13]", true);
+    setPushMsg("تعذّر التفعيل عند: "+where+" — "+(e&&e.name?e.name+": ":"")+(e&&e.message||e)+" [v14]", true);
   }
   pushBusy=false; render();
 }
@@ -1278,9 +1278,11 @@ function testLink(delay){ const e=btoa(pushSub.endpoint).replace(/\+/g,"-").repl
 async function testPush(delay){
   if(!pushSub) return;
   if(!delay){ S.notify.on=true; store.set("settings",S); ensureAudio(); const n=nextPrayer(); fire("حان وقت صلاة "+PNAME[n.k], loc.name+" · تجربة", true); }
-  setPushMsg(delay?"جارٍ جدولة التجربة…":"جارٍ إرسال الإشعار…"); render();
+  // With background mode on, the app itself plays the Athan after the delay, even with the phone locked.
+  if(delay && S.bgAdhan && adhan.bg) setTimeout(()=>{ const n=nextPrayer(); fire("حان وقت صلاة "+PNAME[n.k], loc.name+" · تجربة", true); }, delay*1000);
+  setPushMsg(delay?"أقفل الهاتف الآن…":"جارٍ إرسال الإشعار…"); render();
   try{ const r=await api("test",{endpoint:pushSub.endpoint,delay});
-    if(delay) setPushMsg("سيصلك إشعار الأذان خلال دقيقة أو دقيقتين. أغلق التطبيق وقفل الهاتف الآن.");
+    if(delay) setPushMsg(S.bgAdhan&&adhan.bg?"وصلك الإشعار والأذان؟ إن لم تسمع الأذان فتحقق من أن الشريط الأزرق «الأذان في الخلفية يعمل» ظاهر.":"وصلك الإشعار؟ لسماع الأذان والهاتف مقفل فعّل «الأذان والهاتف مقفل».");
     else setPushMsg(r.opaque||r.ok?"أُرسل إشعار الأذان. سيظهر في أعلى الشاشة خلال ثوانٍ.":"لم يقبل الهاتف الإشعار (رمز "+r.status+").", !(r.opaque||r.ok)); }
   catch(e){
     if(e instanceof TypeError){ pushTestLinks=true; setPushMsg("هذا التطبيق لا يصل إلى الخادم مباشرة. استعمل أزرار التجربة عبر Safari أعلاه."); }
@@ -1325,9 +1327,9 @@ function pushBlock(){
   else if(st==="off") body=`<button class="btn block" data-push-on ${pushBusy?"disabled":""}>${bellSvg(true).replace('<svg','<svg width="18" height="18"')} تفعيل إشعارات الهاتف</button>`;
   else body= (pushTestLinks
       ? `<a class="btn block" href="${esc(testLink(0))}" target="_blank" rel="noopener">تجربة إشعار الهاتف الآن (Safari)</a>
-         <a class="btn soft block" href="${esc(testLink(60))}" target="_blank" rel="noopener">تجربة بعد دقيقة — ثم أقفل الهاتف</a>`
+         <a class="btn soft block" href="${esc(testLink(5))}" target="_blank" rel="noopener">تجربة بعد 5 ثوانٍ — أقفل الهاتف فوراً</a>`
       : `<button class="btn block" data-push-test="0" ${pushBusy?"disabled":""}>${bellSvg(true).replace('<svg','<svg width="18" height="18"')} تجربة الأذان والإشعار الآن</button>
-         <button class="btn soft block" data-push-test="60" ${pushBusy?"disabled":""}>تجربة بعد دقيقة — ثم أقفل الهاتف</button>`)
+         <button class="btn soft block" data-push-test="5" ${pushBusy?"disabled":""}>تجربة بعد 5 ثوانٍ — أقفل الهاتف فوراً</button>`)
     + `<button class="link small" data-push-off style="align-self:flex-start" ${pushBusy?"disabled":""}>إيقاف إشعارات الهاتف</button>`;
   return `<div class="push">
     <div class="push-top"><span class="ic">${bellSvg(true).replace('<svg','<svg width="20" height="20"')}</span><span class="grow"><b>إشعارات الهاتف</b><span class="small muted">تصلك في وقت كل صلاة حتى والتطبيق مغلق</span></span>${pill}</div>
